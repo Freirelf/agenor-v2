@@ -28,7 +28,7 @@ Documento de trabalho, construído em etapas. Cada etapa é validada antes da se
 
 Depois do refinamento, desenvolvimento.
 
-**Desenvolvimento (iniciado em 27/10):** #337 (A0.1 a A0.3) ✅ concluída em 27/10. `agenor-v2` criado com o código exportado, `ORIGEM.md` por projeto, senha do banco do company-service removida dos values, esqueletos do Launcher e dos workers e o `agenor-common` (evento da fila e interface de fila). Próxima: #338 (A0.6).
+**Desenvolvimento (iniciado em 27/10):** #337 (A0.1 a A0.3) ✅ concluída em 27/10. `agenor-v2` criado com o código exportado, `ORIGEM.md` por projeto, senha do banco do company-service removida dos values, esqueletos do Launcher e dos workers e o `agenor-common` (evento da fila e interface de fila). #338 (A0.6) ✅ concluída em 27/10: nove ADRs e o `infra.md` em `docs/arquitetura/`, e as §3.1 a §3.9 resumidas com links. Próxima: #339 (A0.4 e A0.5: ambiente local e verificações automáticas).
 
 **Documentos de trabalho (27/10):** este plano, o `CONTEXTO_E_DECISOES.md`, o relatório de diagnóstico e os documentos do cliente (`cliente/`) passaram a ser versionados em `agenor-v2/docs/`, no repositório de docs. Os entregáveis continuam em `ag-capital/agenor/entregaveis/`.
 
@@ -265,6 +265,8 @@ Fornece e opera o cluster, a fila, o bucket, o banco, os segredos e os pipelines
 
 Decisões técnicas para cada componente, baseadas no código atual (`staging` do scraper `366304a` e do Document Collector `8d2212f`, levantados em 26/10).
 
+**Desde 27/10 (A0.6), o detalhe técnico está nos ADRs e no `infra.md` de [`docs/arquitetura/`](arquitetura/README.md).** As §3.1 a §3.9 resumem cada decisão e apontam para o ADR. As §3.0 e §3.10 a §3.13 continuam aqui. Uma mudança de decisão técnica entra primeiro no ADR.
+
 ### 3.0 O que o código atual mostra e muda o desenho
 
 | Fato | Consequência para o 2.0 |
@@ -284,242 +286,47 @@ Decisões técnicas para cada componente, baseadas no código atual (`staging` d
 
 ### 3.1 Tentativa: a unidade de execução
 
-Cada vez que o Document Collector manda executar uma coleta, ele cria uma **tentativa**, numa **tabela própria do v2**. A `collection_attempt` existente não é reaproveitada, porque o orquestrador antigo continua gravando nela (§3.13, item 5).
-
-- Uma coleta tem uma ou mais tentativas, **no máximo uma ativa por vez**.
-- O identificador da tentativa acompanha a mensagem, o pod, os logs e cada chamada do worker. É ele que liga solicitação → mensagem → pod → execução.
-- Status da tentativa: `QUEUED → STARTING → RUNNING →` um final:
-  - `SUCCEEDED`;
-  - `FAILED`, com o motivo e se é recuperável;
-  - `NO_SESSION`;
-  - `INFRA_FAILED`, quando o pod não subiu, caiu ou estourou memória;
-  - `TIMED_OUT`;
-  - `CANCELLED`, quando a coleta foi cancelada ou a tentativa foi substituída. Não conta como falha técnica nem como retentativa.
-
-Como só existe uma tentativa ativa por coleta, o lock no Redis do scraper deixa de ser necessário, e **os workers não dependem de Redis**.
-
-**Sinal de vida:** o worker avisa o DC ao começar e a cada 1 min. A resposta pode dizer que a tentativa não vale mais (coleta cancelada ou substituída). Nesse caso o worker para entre um item e outro, e a tentativa termina em `CANCELLED`. É o mesmo protocolo do `dispatch_id` do Agnes Collector.
+Cada execução de uma coleta é uma tentativa, numa tabela própria do v2, com no máximo uma ativa por coleta. O worker só informa (itens e resultado), e o DC é o único dono do status da coleta, que mantém os valores de hoje. Sinal de vida a cada 1 min, com cancelamento. Os workers não dependem de Redis. **Detalhe:** [ADR-002](arquitetura/adr-002-tentativa-e-status.md).
 
 ### 3.2 Mensagens e contratos
 
-**Mensagem 1: Document Collector → fila → Launcher**
-
-```json
-{ "version": 1, "type": "DARF", "collected_id": "…", "attempt_id": "…", "dispatched_at": "…" }
-```
-
-- **Só identificadores.** CNPJs, procurador e filtros não trafegam na fila. Mesmo formato do evento do Agnes Collector.
-- **Só vai para a fila o que pode rodar agora.** O DC já respeitou capacidade, ordem e horário de retentativa (§3.4). Por isso não precisamos de canais por tipo.
-- **Configuração da fila:** visibilidade de 15 min, retenção de 7 dias e no máximo 3 entregas, depois DLQ. A OCI não permite ler a DLQ pela API, então a detecção de abandono é feita pelo DC a partir do banco (§3.4).
-
-**Mensagem 2: Launcher → pod**
-
-- O Launcher cria o pod com `ATTEMPT_ID`, `COLLECTED_ID` e `COLLECTION_TYPE` como variáveis de ambiente.
-- Ao subir, o worker **busca a entrada completa no Document Collector** pelo `attempt_id`: cliente, procurador, filtros e `force`. Dados sensíveis não ficam na definição do pod.
-- **Se a tentativa não for mais a vigente**, o DC devolve vazio e o worker encerra sem fazer nada. Isso torna seguras as entregas repetidas da fila.
-
-**API do worker no Document Collector (nova, versionada, só para o Agenor)**
-
-| Chamada | Para quê |
-|---|---|
-| `GET /attempts/{id}/input` | Ler a entrada |
-| `POST /attempts/{id}/start` | Marcar o início (`RUNNING`) |
-| `PUT /attempts/{id}/heartbeat` | Sinal de vida a cada 1 min; responde `{active}` |
-| `PUT /attempts/{id}/items` (lote) | Registrar ou atualizar itens (documento ou competência), com chave idempotente |
-| `GET /collections/{id}/done-items` | Saber o que já foi coletado, para retomar sem baixar de novo |
-| `POST /attempts/{id}/finish` | Resultado final, com erro tipado e se é recuperável |
-
-**API do Launcher no Document Collector**
-
-| Chamada | Para quê |
-|---|---|
-| `POST /attempts/{id}/infra-event` | Pod criado, pod falhou (motivo), pod terminou |
-
-O worker **nunca grava o status da coleta**. Ele informa itens e o resultado da tentativa, e o Document Collector calcula o status.
-
-**Autenticação por usuário de serviço do Agnaldo:**
-- Cada serviço (Launcher e workers) tem um **usuário de serviço no Agnaldo**. Ele obtém o token com `POST /auth/token` e o guarda em memória com folga de 5 min antes de expirar.
-- O DC valida esse token em cada chamada da API nova. O mecanismo exato (chave pública do realm ou `GET /auth/users/me` com cache) será confirmado na implementação.
-- O header de bypass e a identificação só por `X-User-ID` deixam de existir na API nova.
-- O worker já se autentica no Agnaldo para pegar a sessão e-CAC. O mesmo token serve para falar com o DC: uma credencial por serviço.
-- É uma extensão do padrão do Agnes Collector, que usa o Agnaldo para sessões e login, mas identifica o agente no Collector com `base64(agent_id)`. Esse ponto não copiamos.
+Evento da fila só com identificadores (`version`, `type`, `collected_id`, `attempt_id`, `dispatched_at`); o worker busca a entrada completa no DC e descarta se a tentativa não for a vigente. API nova do worker e do Launcher no DC, autenticada por usuários de serviço do Agnaldo. API do consumidor com o mesmo contrato do DC atual. **Detalhe:** [ADR-003](arquitetura/adr-003-contratos.md) e [ADR-006](arquitetura/adr-006-autenticacao-por-usuario-de-servico-do-agnaldo.md).
 
 ### 3.3 Launcher
 
-- **Serviço próprio, sem banco.** O estado fica no Document Collector (tentativas) e no Kubernetes (Jobs).
-- **Catálogo de tipos** (arquivo de configuração versionado com o Launcher). Para cada tipo:
-  - imagem e comando;
-  - CPU e memória;
-  - tempo máximo;
-  - limite de concorrência.
-- **Consumo:** consome tudo o que chega. Quem decide quantas coletas rodam é o DC (§3.4). O Launcher mantém só um **teto de segurança** do cluster: acima dele, não cria o Job e deixa a mensagem voltar para a fila.
-- **Criação:** um **Kubernetes Job** por tentativa, com:
-  - nome determinístico a partir do tipo e do `attempt_id`;
-  - `backoffLimit: 0`, porque quem decide retentativa é o DC;
-  - `activeDeadlineSeconds` do catálogo;
-  - `ttlSecondsAfterFinished`, para limpeza automática;
-  - `restartPolicy: Never`.
-- **Confirmação da mensagem:** a mensagem é apagada **depois que o Job é criado**. Se o Launcher cair entre criar e apagar, a mensagem volta, a criação devolve "já existe" e ela é apagada. Sem duplicidade.
-- **Acompanhamento:** observa os Jobs e informa ao Document Collector, em todos os casos, como o Job terminou: sucesso, falha, prazo estourado, falta de memória ou imagem inexistente.
-- **Reinício:** ao subir, reconcilia os Jobs existentes antes de consumir.
-- **Réplicas:** uma réplica basta no início, porque a fila segura os pedidos e todas as operações são idempotentes. Alta disponibilidade (duas réplicas com eleição de líder) fica para depois.
+Serviço sem banco, com catálogo de tipos versionado. Um Kubernetes Job por tentativa, com nome determinístico e `backoffLimit: 0`; a mensagem é apagada depois que o Job é criado. Informa ao DC como cada Job terminou. Só mantém um teto de segurança; uma réplica no início. **Detalhe:** [ADR-005](arquitetura/adr-005-launcher-com-kubernetes-jobs.md).
 
 ### 3.4 Document Collector
 
-**Duas releases, um banco:**
-- O **DC v2** é exportado do DC atual para o `agenor-v2` e roda em **release própria**, no mesmo banco. Atende só o Agenor 2.0.
-- O **DC atual** continua no ar, sem alteração, atendendo o AGuiar, o scraper e a API antiga.
-- **O DC v2 usa um schema próprio, `agenor_v2`, no mesmo banco** (decidido em 27/10).
-  - Não escreve no `public`, onde ficam as tabelas do DC atual (Agenor e AGuiar, diferenciados só pelo `collection_type`).
-  - O código do DC atual e da `-apisix` consulta só o `public`, então os orquestradores e sweepers deles não enxergam as coletas do v2.
-  - A `alembic_version` do v2 fica dentro do schema.
-  - Se um dia o Agenor precisar de banco próprio, o schema sai inteiro (`pg_dump -n agenor_v2`).
-
-**Muda no DC v2:**
-- API nova do worker e do Launcher (§3.2), autenticada.
-- Publica a mensagem mínima, só com identificadores.
-- **Único dono do status:** calcula o status da coleta a partir dos itens e do resultado da tentativa. Mantém os valores de status de hoje (`PENDING`, `PROCESSING`, `WAITING_SESSION`, `FINISHED`, `PARTIALLY_FINISHED`, `FINISHED_EMPTY`, `FAILED`) para não quebrar quem consulta.
-- **Retentativa por política de tipo:**
-
-  | Resultado | Ação |
-  |---|---|
-  | Sem sessão (`NO_SESSION`) | `WAITING_SESSION` e nova tentativa com espera crescente (5, 15, 30, 60, 60 min…) até um limite. Depois, `FAILED` com o motivo |
-  | Falha de infra ou prazo estourado | Nova tentativa, com limite |
-  | Erro recuperável | Nova tentativa, com limite |
-  | Erro não recuperável (ex.: procuração inválida) | `FAILED` imediato |
-
-- **Despachante** (padrão Agnes Collector, ADR-002 de lá). A tabela de tentativas é a fila de verdade, e a OCI Queue só transporta. Para cada tipo:
-  1. pega um lock no banco;
-  2. calcula as vagas: limite do tipo menos as tentativas já despachadas e não concluídas;
-  3. escolhe as próximas tentativas prontas (hora de retentativa já chegou), em ordem;
-  4. publica na fila e, **só depois que a OCI confirma**, marca a tentativa como despachada.
-
-  Roda por evento (coleta criada, tentativa encerrada) e numa varredura a cada 1 min, como rede de segurança. Substitui o `dispatch_due_attempts`, hoje um stub.
-- **Limites iniciais:** **6 no total**, igual a hoje. Créditos DCTFWeb fica limitado também pelo Moon (até 4 sessões). Os limites sobem conforme medirmos o Agnaldo e os proxies. Não há limite por procurador: o Agnaldo já reserva sessões de forma atômica, e quem não consegue cai em `NO_SESSION`.
-- **Abandono** (detectado pelo banco, como no Agnes Collector):
-  - o worker começou e está sem sinal de vida há mais de 5 min; ou
-  - nenhum worker começou a tentativa em 60 min.
-
-  Em ambos os casos é falha técnica. O Launcher também informa as falhas de pod que vê. Existe **um único** processo de varredura.
-- **Duas contagens separadas:**
-  - **falha técnica** (pod, abandono, prazo): até 3, depois `FAILED`;
-  - **retentativa de negócio** (sem sessão, erro recuperável): espera de 5, 15, 30, 60 e 60 min, depois a cada 60 min, até o limite do tipo.
-- **Sem Temporal nesta fase.** O Agnes Collector usa Temporal para horários e agendamentos recorrentes. O Agenor não tem agendamento recorrente agora, e a varredura de 1 min resolve as esperas de retentativa.
-- **Histórico de eventos** no formato do Agnes Collector:
-  - categoria;
-  - nome com ponto (`collection.dispatched`, `attempt.no_session`, `item.downloaded`);
-  - mensagem;
-  - autor (`ROBOT`, `USER` ou `SYSTEM`);
-  - metadados.
-
-  As tabelas de eventos atuais continuam para o AGuiar. A coleta ganha também um `status_text` legível.
-- **ZIP fora da requisição:** quando a coleta chega a um status final, o DC cria uma tentativa do tipo `ZIP`. O Launcher a executa como qualquer worker, reaproveitando o ZIP em streaming do `agenor_download_service`.
-- **O DC v2 nasce sem:**
-  - `query_consult` (SQL livre);
-  - `/test-collected`;
-  - `/sentry-debug` público;
-  - CORS liberado para qualquer origem.
-
-  O DC atual continua com eles, porque o scraper usa o `query_consult` no PER/DCOMP. Saem quando o DC atual deixar de atender o Agenor.
-
-**Fica como está no DC atual:**
-- A API atual (`/execucao`, `/status` e o resto), as filas e as regras de ZIP do AGuiar.
-- As tabelas do `public` (`collected`, `collection_execution` e as demais) não são alteradas pelo v2, que escreve só no schema `agenor_v2`. O DC atual precisa continuar subindo e funcionando com esse schema presente.
-
-**Migrações do v2:**
-- Alembic, aplicado por um Job de hook do Helm antes de cada deploy (`pre-install,pre-upgrade`), como no Agnes Collector. No v2, deixa de rodar no start do pod.
-- **Versão do Alembic dentro do schema `agenor_v2`.** O DC atual continua rodando `alembic upgrade head` no start sobre a `alembic_version` do `public`. Se as revisões do v2 entrassem nessa tabela, o DC atual não encontraria a revisão registrada e deixaria de subir.
-
-**Banco do company-service:** o acesso continua por enquanto (o GPS por filial e os nomes de empresa dependem dele). Pedimos ao cliente um usuário somente leitura com credencial em Secret.
+- **Duas releases, um banco:** o DC v2 roda em release própria, isolado no schema `agenor_v2`, com a `alembic_version` dentro dele e a migração como hook do Helm. O DC atual continua intacto para o AGuiar e o scraper. **Detalhe:** [ADR-001](arquitetura/adr-001-isolamento-no-schema-agenor-v2.md).
+- **Despachante, retentativa e abandono:** a tabela de tentativas é a fila de verdade; o DC decide capacidade (6 no total, Créditos DCTFWeb até 4), retentativa (falha técnica até 3, separada da de negócio com espera de 5, 15, 30, 60 e 60 min) e abandono (5 min sem sinal de vida ou 60 min sem início). Sem Temporal nesta fase. **Detalhe:** [ADR-004](arquitetura/adr-004-despachante-e-retentativa.md).
+- **Histórico de eventos** no formato do Agnes Collector e `status_text` legível ([ADR-002](arquitetura/adr-002-tentativa-e-status.md)). **ZIP** como tentativa do tipo `ZIP` ([ADR-007](arquitetura/adr-007-workers-por-tipo-com-base-comum.md)).
+- **O DC v2 nasce sem** `query_consult`, `/test-collected`, `/sentry-debug` público, CORS aberto, rotas antigas sobre o `public`, orquestrador, sweepers e consumo da fila antiga (A1.13).
+- **Banco do company-service:** o acesso continua, com usuário somente leitura em Secret (pedido 11).
 
 ### 3.5 Dados extraídos
 
-Detalhado por tipo quando cada coletor for portado (fase 4), não agora. Diretriz para esta versão:
-- os parsers e as planilhas XLSX que o scraper gera hoje são reaproveitados, porque as planilhas são a entrega ao usuário;
-- a extração também é guardada em JSON no bucket;
-- tabelas de extração, API de consulta e cópia do histórico ficam para depois.
+Detalhado por tipo quando cada coletor for portado (fase 4). Nesta versão, parsers e planilhas reaproveitados e a extração em JSON no bucket; tabelas, API de consulta e cópia do histórico ficam para depois. **Detalhe:** [ADR-007](arquitetura/adr-007-workers-por-tipo-com-base-comum.md).
 
 ### 3.6 Workers
 
-- **Repositório único para os workers, `agenor-workers`** (um repositório só para todos os tipos, separado dos demais serviços):
-
-  ```
-  core/        base comum
-  workers/     um pacote por tipo: dctf_web, creditos_dctf_web, perdcomp, perdcomp_consultant,
-               dctf, dirf, darf, gps, fontes_pagadoras, zip
-  ```
-
-- **Um worker por tipo de coleta**, com entrypoint `python -m workers.<tipo>`.
-- **Duas imagens:**
-  - **padrão:** HTTP e bibliotecas de PDF;
-  - **com Chrome:** só para o DCTF (HTML→PDF).
-  O catálogo do Launcher diz qual usar. Imagem por worker só se o tamanho justificar.
-- **A base comum (`core`) executa o fluxo, e o worker só implementa o que é dele:**
-
-  | Etapa | Quem faz |
-  |---|---|
-  | Ler a entrada; descartar se a tentativa for obsoleta | core |
-| Sinal de vida a cada 1 min; parar se a tentativa for cancelada | core |
-  | Reservar sessão, manter ativa, trocar perfil e **sempre** devolver, inclusive no SIGTERM (Agnaldo, mesmo fluxo do Agnes Collector) | core |
-  | Planejar itens (competências, documentos) | worker |
-  | Pular itens já coletados | core |
-  | Coletar o item no portal | worker |
-  | Gravar no bucket com chave determinística | core |
-  | Extrair dados do arquivo | worker (parsers atuais) |
-  | Registrar o item no DC e gravar o JSON da extração no bucket | core |
-  | Encerrar com resultado e erro tipado | core |
-
-- **Configuração por variáveis de ambiente validadas** (`pydantic-settings`), todas documentadas num `.env.example`. Sem URL de produção fixa no código.
-- **Erros tipados:** o catálogo atual (`collection_error_map`, que já tem a marcação de recuperável) passa a valer de fato. Acaba a classificação por trecho de mensagem.
-- **Chave no bucket única para todos os tipos:** `{cnpj_certificado}/{cnpj_cliente}/{tipo}/{período}/{arquivo}`, o padrão que DARF, DCTF, DCTFWeb e PER/DCOMP já usam. GPS, DIRF, Fontes, Créditos e Consultor passam a usá-lo e ganham retomada.
-- **Sai:**
-  - o coletor DCTFWeb legado (Selenium);
-  - o stub `fill_dctf_web`;
-  - o data-collector;
-  - o Redis.
-- **Dependências externas por worker:**
-
-  | Dependência | Usada por |
-  |---|---|
-  | Agnaldo (sessão e-CAC) | todos, exceto ZIP |
-  | Proxies Soax e Oxylabs | portais da Receita |
-  | Moon | Créditos DCTFWeb |
-  | session-manager e hCaptcha | DARF |
-  | SERPRO, via Agnaldo | DARF |
+Repositório `agenor-workers`, com `core/` (base comum que executa o fluxo) e um pacote por tipo em `workers/`. Duas imagens (padrão e com Chrome, só para o DCTF), chave única no bucket, erros tipados e configuração validada. Saem o DCTFWeb legado, o `fill_dctf_web`, o data-collector e o Redis. **Detalhe:** [ADR-007](arquitetura/adr-007-workers-por-tipo-com-base-comum.md).
 
 ### 3.7 Segurança
 
-- Autenticação entre serviços por usuários de serviço do Agnaldo (§3.2), uma credencial por serviço.
-- Fim do SQL livre, dos endpoints de teste e do CORS aberto.
-- Nenhum dado fiscal ou pessoal na fila nem na definição dos pods.
-- Workers sem root e com permissões mínimas. O Launcher só pode gerenciar Jobs no namespace dos workers.
-- Saída de rede dos workers restrita ao necessário: Receita, proxies, Agnaldo, Moon, Document Collector e bucket.
-- Segredos só em Secret, nunca em ConfigMap ou log.
-- Sem `DEBUG_MODE` e sem gravação de vídeo do navegador em produção.
+- Autenticação entre serviços por usuários de serviço do Agnaldo ([ADR-006](arquitetura/adr-006-autenticacao-por-usuario-de-servico-do-agnaldo.md)).
+- Fim do SQL livre, dos endpoints de teste e do CORS aberto (§3.4).
+- Nenhum dado fiscal ou pessoal na fila nem na definição dos Jobs ([ADR-003](arquitetura/adr-003-contratos.md)).
+- Workers sem root; o Launcher só gerencia Jobs no namespace dos workers; saída de rede dos workers restrita ([infra.md](arquitetura/infra.md)).
+- Segredos só em Secret, nunca em ConfigMap ou log. Sem `DEBUG_MODE` e sem vídeo do navegador em produção ([ADR-008](arquitetura/adr-008-observabilidade.md)).
 
 ### 3.8 Observabilidade
 
-No padrão do Agnes Collector, com uma melhoria nos logs:
-
-- **Traces:** OpenTelemetry via OTLP para o Alloy do cliente, ligado por `OTEL_EXPORTER_OTLP_ENDPOINT`. `OTEL_SERVICE_NAME` por serviço e `collected_id` e `attempt_id` como atributos.
-- **Métricas:** `/metrics` (Prometheus) no DC e no Launcher, com ServiceMonitor. Como os Jobs vivem pouco, as métricas de negócio saem do DC:
-  - coletas por status e por tipo;
-  - tentativas despachadas e em execução;
-  - duração e resultado por tipo;
-  - motivos de falha.
-- **Logs:** em JSON, com `collected_id`, `attempt_id` e o nome do Job em toda linha. O Agnes Collector usa texto livre; aqui melhoramos.
-- **Health checks:** os do DC e do Launcher refletem se estão de fato funcionando. O do Launcher verifica se ele está consumindo, o que hoje o scraper não faz.
+OTel para o Alloy, `/metrics` com ServiceMonitor no DC e no Launcher, métricas de negócio saindo do DC, logs em JSON com `collected_id` e `attempt_id`, e health checks reais. **Detalhe:** [ADR-008](arquitetura/adr-008-observabilidade.md).
 
 ### 3.9 Virada para produção
 
-1. **Desenvolvimento e validação no ambiente local**, inclusive a comparação com o scraper (fases 1 a 5).
-2. **DEV e STG**, com o Agenor 2.0 em releases próprias. Em STG, as mesmas solicitações rodam na versão atual e no 2.0, e comparamos, por tipo, os itens, os arquivos e os dados extraídos (JSON do 2.0 contra as tabelas da versão atual).
-3. **Deploy em PRD do Agenor 2.0** (DC v2, Launcher e workers) em releases próprias, ao lado da versão atual e no mesmo banco. O DC atual e o scraper não são tocados.
-4. **Virada única, pelos consumidores:** os consumidores do Agenor passam a chamar o DC v2, por rota ou URL. A partir daí, as coletas novas vão todas para o 2.0. O que já estava na versão atual termina lá.
-5. **Plano de volta:** durante uma janela combinada (ex.: duas semanas), a versão atual continua no ar. Voltar é apontar os consumidores de novo para o DC atual.
-6. **Fim da janela:** o scraper é desligado. O Agenor deixa de usar o DC atual, e o que fazer com ele (inclusive para o AGuiar) é decisão do cliente.
-
-Isso não é a convivência tipo a tipo descartada na Visão: a virada é única para todos os tipos. O custo é baixo porque o DC atual já precisa continuar no ar para o AGuiar. Por isso também **não há chave de ambiente**: a versão atual não recebe código novo.
+Local → DEV e STG (com comparação lado a lado em STG) → deploy em PRD ao lado da versão atual → virada única pelos consumidores → janela de volta → desligamento do scraper. Sem chave de ambiente. **Detalhe:** [ADR-009](arquitetura/adr-009-virada-unica-pelos-consumidores.md).
 
 ### 3.10 Pedidos ao cliente
 
@@ -596,7 +403,7 @@ Isso não é a convivência tipo a tipo descartada na Visão: a virada é única
 | Chart Helm por serviço, `kubernetes/<serviço>/<cluster>/values*.yaml`, ConfigMap gerado dos values, Secrets via `envFrom`, migração como hook | §3.4, §3.10 |
 | Pipeline Bitbucket: Sonar e SBOM (Dependency-Track) em paralelo, build no Harbor com cache, `helm upgrade --install --wait`, PRD manual | §3.10 |
 | OTel para o Alloy, `/metrics` com ServiceMonitor | §3.8 |
-| Documentação em ADRs, por fase, e um `infra.md` com só o que o código precisa do ambiente | etapa 5 |
+| Documentação em ADRs, por fase, e um `infra.md` com só o que o código precisa do ambiente | [`docs/arquitetura/`](arquitetura/README.md) |
 
 **Não copiados (melhorados):**
 - autenticação com `base64(agent_id)`;
@@ -612,7 +419,7 @@ Isso não é a convivência tipo a tipo descartada na Visão: a virada é única
 **Mudanças em decisões já validadas (26/10):**
 1. **A concorrência passa a ser decidida pelo Document Collector** (despachante), não pelo Launcher. O Launcher fica só com um teto de segurança do cluster. Com isso, não são necessários canais por tipo na fila. Aceita conforme as recomendações.
 2. **A autenticação entre serviços passa a ser por usuários de serviço do Agnaldo**, não por clients no Keycloak. Aprovada explicitamente.
-3. **Duas releases no mesmo banco, em vez de chave de virada** (refinamento de 26/10). O DC v2 sobe ao lado do atual, com `alembic_version_v2`. Aprovada explicitamente.
+3. **Duas releases no mesmo banco, em vez de chave de virada** (refinamento de 26/10). O DC v2 sobe ao lado do atual. Aprovada explicitamente. A `alembic_version_v2` da primeira versão foi substituída em 27/10 pelo schema `agenor_v2`, com a `alembic_version` dentro dele ([ADR-001](arquitetura/adr-001-isolamento-no-schema-agenor-v2.md)).
 
 **eSocial:** o Agnes Collector **é** o coletor de eSocial (RPA com Puppeteer, sessões `sessao-esocial` do Agnaldo). Isso explica a caixa "eSocial Collector" no desenho do cliente. Fica fora desta fase, como combinado. A integração dele como mais um "motor" do Agenor entra depois.
 

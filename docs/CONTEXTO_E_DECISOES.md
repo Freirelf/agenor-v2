@@ -158,3 +158,25 @@ Até 27/10, só a sessão de refinamento editava o `PLANO_AGENOR_2_0.md`. Desde 
 - **DC herdado:** testes corrigidos na A0.4 (condição do M0); `ruff` adotado no fim da A1.13.
 
 **Próximo:** #338 (A0.6): a §3 do plano convertida em ADRs e o `infra.md`.
+
+### Desenvolvimento, 27/10: #338 (A0.6)
+
+- **Nove ADRs em `docs/arquitetura/`,** a partir da §3 do plano, no formato do Agnes Collector:
+  - 001 isolamento no schema `agenor_v2`;
+  - 002 tentativa e status;
+  - 003 contratos;
+  - 004 despachante e retentativa;
+  - 005 Launcher com Kubernetes Jobs;
+  - 006 autenticação por usuários de serviço do Agnaldo;
+  - 007 workers por tipo com base comum;
+  - 008 observabilidade;
+  - 009 virada única pelos consumidores.
+- **`infra.md`:** só o que o código precisa do ambiente (banco, fila, bucket, cluster e RBAC, autenticação, imagens, rede, recursos, observabilidade), com a coluna local e a dos ambientes. Cada item diz se já está definido, se sai de uma atividade (com o código dela) ou se depende do cliente.
+- **Plano:** as §3.1 a §3.9 viraram resumos com links para os ADRs. As §3.0 e §3.10 a §3.13 continuam no plano. Uma mudança de decisão técnica entra primeiro no ADR.
+- **Detalhes fixados na conversão:**
+  - `STARTING` = o Launcher criou o Job. A publicação na fila fica em `dispatched_at`, não no status.
+  - O limite de concorrência é só do DC: saiu do catálogo do Launcher.
+  - Abandono e aviso do Launcher sobre o mesmo Job: o primeiro encerra a tentativa, e o segundo é ignorado.
+- **Ficam em aberto nos ADRs:** a regra exata do cálculo de status (A1.7) e a forma de validar o token do Agnaldo (A1.2). Os nomes de variáveis "a definir" no `infra.md` são fixados nas atividades indicadas.
+
+**Próximo:** #339 (A0.4 e A0.5): CI de qualidade nos quatro repositórios, com os testes herdados do DC passando, e o ambiente local.
