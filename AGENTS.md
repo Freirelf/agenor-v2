@@ -16,6 +16,7 @@ Esta pasta é uma pasta de trabalho. O Git dela versiona só a documentação; c
 | `agenor-launcher/` | próprio | Consome a fila e cria um Kubernetes Job por tentativa |
 | `agenor-workers/` | próprio | `core/` (base comum) e `workers/` (um por tipo de coleta) |
 | `agenor-common/` | próprio | Contratos (evento da fila, modelos da API) e interface de fila, instalado por tag Git |
+| `docs/` | este | Plano, contexto e decisões, diagnóstico e documentos do cliente |
 | `docs/arquitetura/` | este | ADRs e `infra.md` |
 | `referencia/` | nenhum | Snapshots do scraper e do download service, só para consulta |
 
@@ -23,8 +24,10 @@ Os repositórios ainda não têm remoto. Depois terão dois: o GitHub da Solfy e
 
 ## Plano e decisões
 
-- Plano (fonte de trabalho): `../agenor/PLANO_AGENOR_2_0.md`. Só a sessão de refinamento do plano o edita.
-- Contexto e histórico das decisões: `../agenor/CONTEXTO_E_DECISOES.md`.
+- Plano (fonte de trabalho): `docs/PLANO_AGENOR_2_0.md`. Status das atividades, roadmap e pontos de atenção estão nele.
+- Contexto e histórico das decisões: `docs/CONTEXTO_E_DECISOES.md`.
+- Diagnóstico do sistema atual: `docs/RELATORIO_DIAGNOSTICO_AGENOR.md`.
+- Documentos enviados pelo cliente: `docs/cliente/` (só referência de intenção; ver o contexto).
 - As decisões técnicas viram ADRs em `docs/arquitetura/`. Consulte o ADR antes de mudar algo que ele cobre.
 
 ## Regras comuns

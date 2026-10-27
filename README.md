@@ -14,5 +14,6 @@ Esta pasta reúne o projeto para o trabalho local. O repositório dela guarda s�
 | `agenor-launcher/` | próprio | Consome a fila e cria um Kubernetes Job por tentativa |
 | `agenor-workers/` | próprio | `core/` (base comum) e `workers/` (um por tipo) |
 | `agenor-common/` | próprio | Contratos (evento da fila, modelos da API) e interface de fila, instalado por tag Git |
+| `docs/` | este | Plano (`PLANO_AGENOR_2_0.md`), contexto e decisões, diagnóstico, documentos do cliente |
 | `docs/arquitetura/` | este | ADRs e `infra.md` |
 | `referencia/` | nenhum | Snapshots do scraper e do download service, só para consulta ao portar os coletores |
