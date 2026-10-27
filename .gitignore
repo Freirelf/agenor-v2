@@ -1,0 +1,7 @@
+# Repositório de docs da pasta de trabalho: cada serviço tem o seu próprio Git
+/agenor-document-collector/
+/agenor-launcher/
+/agenor-workers/
+/agenor-common/
+/referencia/
+.DS_Store
