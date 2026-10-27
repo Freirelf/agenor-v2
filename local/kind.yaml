@@ -1,0 +1,6 @@
+# Cluster local para os Jobs do Launcher (A0.5). Contexto: kind-agenor.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: agenor
+nodes:
+  - role: control-plane

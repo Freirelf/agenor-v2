@@ -13,6 +13,7 @@ Documento de trabalho, construído em etapas. Cada etapa é validada antes da se
 6. **Atividades.** ✅ primeira versão escrita (antecipada para entrar no documento base)
 
 **Refinamento (iniciado em 26/10):**
+
 - revisão das etapas 1 a 4 ✅ concluída em 26/10;
 - revisão item a item das atividades do alicerce (fases 0 a 2) ✅ concluída em 27/10; as fases 3 a 6 ficam no nível atual e são detalhadas na vez de cada uma;
 - prazos do alicerce ✅ definidos em 27/10 (§6): M0 em 29/10 e M1 em 13/11 (18/11 com folga), acompanhados no Squads;
@@ -28,15 +29,16 @@ Documento de trabalho, construído em etapas. Cada etapa é validada antes da se
 
 Depois do refinamento, desenvolvimento.
 
-**Desenvolvimento (iniciado em 27/10):** #337 (A0.1 a A0.3) ✅ concluída em 27/10. `agenor-v2` criado com o código exportado, `ORIGEM.md` por projeto, senha do banco do company-service removida dos values, esqueletos do Launcher e dos workers e o `agenor-common` (evento da fila e interface de fila). #338 (A0.6) ✅ concluída em 27/10: nove ADRs e o `infra.md` em `docs/arquitetura/`, e as §3.1 a §3.9 resumidas com links. Próxima: #339 (A0.4 e A0.5: ambiente local e verificações automáticas).
+**Desenvolvimento (iniciado em 27/10):** #337 (A0.1 a A0.3) ✅ concluída em 27/10. `agenor-v2` criado com o código exportado, `ORIGEM.md` por projeto, senha do banco do company-service removida dos values, esqueletos do Launcher e dos workers e o `agenor-common` (evento da fila e interface de fila). #338 (A0.6) ✅ concluída em 27/10: nove ADRs e o `infra.md` em `docs/arquitetura/`, e as §3.1 a §3.9 resumidas com links. #339 (A0.4 e A0.5) ✅ concluída em 27/10: testes herdados do DC passando e ambiente local em `local/` (Postgres, S3 local, DC atual e cluster kind). **M0 atingido em 27/10.** O CI ficou fora: pipelines são infra do cliente. Próxima: #340 (A1.1 a A1.4, A1.13, A1.17: DC 2.0, base).
 
 **Documentos de trabalho (27/10):** este plano, o `CONTEXTO_E_DECISOES.md`, o relatório de diagnóstico e os documentos do cliente (`cliente/`) passaram a ser versionados em `agenor-v2/docs/`, no repositório de docs. Os entregáveis continuam em `ag-capital/agenor/entregaveis/`.
 
-**Estado herdado do DC (27/10):** dos testes atuais, 560 passam, 54 falham e 109 dão erro (o `Settings` exige variáveis de ambiente no import, e um teste importa um módulo removido). O `black` e o `isort` herdados não passam, e não há `ruff`. Os testes entram na A0.4, porque são condição do M0. O `ruff` (lint e formatação) entra no fim da A1.13, num commit só de formatação: a partir dele, as mudanças da origem deixam de entrar por diff e passam a ser portadas à mão.
+**Estado herdado do DC (27/10):** dos testes atuais, 560 passam, 54 falham e 109 dão erro (o `Settings` exige variáveis de ambiente no import, e um teste importa um módulo removido). O `black` e o `isort` herdados não passam, e não há `ruff`. Os testes entraram na A0.4 ✅ (27/10): 715 passam e 2 são pulados. O `ruff` (lint e formatação) entra no fim da A1.13, num commit só de formatação: a partir dele, as mudanças da origem deixam de entrar por diff e passam a ser portadas à mão.
 
 **Estrutura de repositórios (27/10):** o `agenor-v2` virou uma pasta de trabalho com quatro repositórios separados (`agenor-document-collector`, `agenor-launcher`, `agenor-workers`, `agenor-common`), um repositório de docs e a `referencia/` fora do Git (§4, fase 0). **Hospedagem (27/10):** cada repositório terá dois remotos, o GitHub da Solfy para o nosso time e o Bitbucket do cliente. ✅ Os cinco subiram para o GitHub em 27/10 (`origin`); o Bitbucket do cliente entra depois.
 
 **Harness de desenvolvimento ✅ concluído em 27/10:** `AGENTS.md` na raiz do `agenor-v2` (contexto entre repositórios) e um em cada repositório (comandos e armadilhas dele), `scripts/agent/verify.sh` por repositório e um na raiz, `.claude/` (settings, hooks) só na raiz e o subagente revisor do isolamento do banco. O hook de bloqueio foi testado com 31 casos, e o `verify.sh` da raiz reporta o estado real (os três esqueletos passam; o DC falha pelo estado herdado acima). Como validar: `AGENTS.md` da raiz, seção "Verificação". Componentes que só entram quando o procedimento existir:
+
 - **skill "nova migração no `agenor_v2`":** ao concluir a primeira migração real (#340, A1.3), a partir do que funcionou e do ADR de dados;
 - **skill "portar um coletor":** ao concluir o piloto Fontes Pagadoras (A3.10, M2);
 - **`docs/agent/`:** só se surgir contexto que os ADRs não cubram.
@@ -80,15 +82,15 @@ Front → Agnaldo → Document Collector → fila → Launcher → pod do worker
 
 ### O que muda em cada parte
 
-| Parte | Hoje | No 2.0 |
-|---|---|---|
-| Front | Existe só em STG/DEV | Fora desta fase |
+| Parte              | Hoje                                                                    | No 2.0                                                                                                                                                                 |
+| ------------------ | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Front              | Existe só em STG/DEV                                                    | Fora desta fase                                                                                                                                                        |
 | Document Collector | Núcleo: registra, publica, recebe callbacks, guarda extrações, gera ZIP | **DC v2** em release própria, no mesmo banco: orquestrador que recebe a solicitação, registra, manda executar e acompanha o status. O DC atual continua no ar, intacto |
-| Fila | OCI Queue consumida pelo scraper | OCI Queue consumida pelo Launcher |
-| **Launcher** | Não existe | **Novo, desenvolvido por nós** |
-| Workers | Scraper único com todos os tipos | Um worker por tipo, em três etapas: ler, coletar, guardar |
-| Dados extraídos | Tabelas por tipo no Document Collector | Nesta versão, só em JSON no bucket, ao lado do arquivo. Tabelas no banco, consulta e histórico ficam para depois (§3.5) |
-| Agnaldo | Sessões e-CAC, certificados, gateway | Mantido; integração via API, sem alteração |
+| Fila               | OCI Queue consumida pelo scraper                                        | OCI Queue consumida pelo Launcher                                                                                                                                      |
+| **Launcher**       | Não existe                                                              | **Novo, desenvolvido por nós**                                                                                                                                         |
+| Workers            | Scraper único com todos os tipos                                        | Um worker por tipo, em três etapas: ler, coletar, guardar                                                                                                              |
+| Dados extraídos    | Tabelas por tipo no Document Collector                                  | Nesta versão, só em JSON no bucket, ao lado do arquivo. Tabelas no banco, consulta e histórico ficam para depois (§3.5)                                                |
+| Agnaldo            | Sessões e-CAC, certificados, gateway                                    | Mantido; integração via API, sem alteração                                                                                                                             |
 
 ### Tipos de coleta
 
@@ -154,6 +156,7 @@ Esta etapa define **o que cada parte faz e o que não faz**. Como cada uma faz (
 ### Document Collector: orquestrador
 
 **Faz:**
+
 - Recebe as solicitações de coleta pela API, de qualquer consumidor (front no futuro, Agnaldo, integrações).
 - Valida e registra a coleta. É o **único dono do estado**: o que foi pedido, em que status está, o histórico e o resultado.
 - Decide o que executar, quanto e quando (capacidade por tipo), e publica o pedido na fila.
@@ -162,6 +165,7 @@ Esta etapa define **o que cada parte faz e o que não faz**. Como cada uma faz (
 - Disponibiliza o resultado: status e arquivos. Os dados extraídos ficam em JSON no bucket nesta versão.
 
 **Não faz:**
+
 - Não coleta e não fala com os portais da Receita.
 - Não cria nem gerencia pods.
 - Não expõe consulta SQL livre.
@@ -177,6 +181,7 @@ Esta etapa define **o que cada parte faz e o que não faz**. Como cada uma faz (
 ### Launcher: quem põe o worker para rodar
 
 **Faz:**
+
 - Consome os pedidos da fila.
 - Identifica qual worker atende o tipo de coleta.
 - Cria o pod do worker e entrega a entrada da execução.
@@ -185,6 +190,7 @@ Esta etapa define **o que cada parte faz e o que não faz**. Como cada uma faz (
 - Avisa o Document Collector quando o pod falha sem conseguir reportar: não subiu, travou, estourou o tempo ou a memória.
 
 **Não faz:**
+
 - Não coleta e não conhece regra fiscal.
 - Não decide retentativa: só informa a falha.
 - Não guarda dados de coleta.
@@ -192,6 +198,7 @@ Esta etapa define **o que cada parte faz e o que não faz**. Como cada uma faz (
 ### Worker: quem coleta (um por tipo)
 
 **Faz, em três etapas:**
+
 1. **Ler:** recebe do Launcher só os identificadores e busca a entrada completa no Document Collector.
 2. **Coletar:** obtém a sessão e-CAC no Agnaldo, troca para o perfil do cliente e coleta os documentos e dados no portal. Aplica as regras fiscais do tipo.
 3. **Guardar:** grava no bucket os arquivos e o JSON da extração, e entrega ao Document Collector o status e o resultado.
@@ -199,6 +206,7 @@ Esta etapa define **o que cada parte faz e o que não faz**. Como cada uma faz (
 Termina ao fim da execução, com sucesso ou falha.
 
 **Não faz:**
+
 - Não consome a fila.
 - Não acessa o banco: tudo passa pelo Document Collector.
 - Não decide retentativa nem mantém estado entre execuções.
@@ -206,6 +214,7 @@ Termina ao fim da execução, com sucesso ou falha.
 ### Base comum dos workers
 
 Tudo que hoje se repete em cada coletor do scraper vira uma base compartilhada por todos os workers:
+
 - leitura da entrada;
 - sessão e troca de perfil no Agnaldo;
 - comunicação de status com o Document Collector;
@@ -218,11 +227,11 @@ Cada worker fica só com o que é específico do seu tipo: o fluxo no portal, as
 
 ### Serviços que usamos e não alteramos
 
-| Serviço | Papel para o Agenor 2.0 |
-|---|---|
-| **Agnaldo** | Fornece a sessão e-CAC do procurador, os certificados e o acesso ao SERPRO. Usado pelos workers via API. |
-| **Bucket (OCI Object Storage)** | Guarda os arquivos coletados. |
-| **Banco (PostgreSQL)** | Guarda o estado e os dados das coletas. Acessado só pelo Document Collector. |
+| Serviço                         | Papel para o Agenor 2.0                                                                                  |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Agnaldo**                     | Fornece a sessão e-CAC do procurador, os certificados e o acesso ao SERPRO. Usado pelos workers via API. |
+| **Bucket (OCI Object Storage)** | Guarda os arquivos coletados.                                                                            |
+| **Banco (PostgreSQL)**          | Guarda o estado e os dados das coletas. Acessado só pelo Document Collector.                             |
 
 ### Cliente (infraestrutura)
 
@@ -230,16 +239,16 @@ Fornece e opera o cluster, a fila, o bucket, o banco, os segredos e os pipelines
 
 ### Quem fala com quem
 
-| De → para | Para quê |
-|---|---|
-| Consumidor → Document Collector | Solicitar coleta, consultar status e resultado |
-| Document Collector → fila → Launcher | Pedido de execução |
-| Launcher → cluster | Criar, acompanhar e derrubar o pod |
-| Launcher → Document Collector | Avisar falha de pod |
-| Worker → Agnaldo | Sessão e-CAC, certificado, SERPRO |
-| Worker → portais da Receita | Coleta |
-| Worker → bucket | Gravar arquivos |
-| Worker → Document Collector | Ler a entrada da execução; informar status, resultado e dados |
+| De → para                            | Para quê                                                      |
+| ------------------------------------ | ------------------------------------------------------------- |
+| Consumidor → Document Collector      | Solicitar coleta, consultar status e resultado                |
+| Document Collector → fila → Launcher | Pedido de execução                                            |
+| Launcher → cluster                   | Criar, acompanhar e derrubar o pod                            |
+| Launcher → Document Collector        | Avisar falha de pod                                           |
+| Worker → Agnaldo                     | Sessão e-CAC, certificado, SERPRO                             |
+| Worker → portais da Receita          | Coleta                                                        |
+| Worker → bucket                      | Gravar arquivos                                               |
+| Worker → Document Collector          | Ler a entrada da execução; informar status, resultado e dados |
 
 **Toda chamada entre serviços é autenticada** (princípio 4 da Visão).
 
@@ -269,20 +278,20 @@ Decisões técnicas para cada componente, baseadas no código atual (`staging` d
 
 ### 3.0 O que o código atual mostra e muda o desenho
 
-| Fato | Consequência para o 2.0 |
-|---|---|
-| O scraper processa **uma coleta por réplica**; com 6 réplicas, no máximo 6 coletas simultâneas | O limite atual de paralelismo é 6. É o ponto de partida dos limites do Launcher |
-| Uma coleta pode durar horas (a mensagem é renovada na fila por até 4 h) | Cada tipo precisa de um tempo máximo próprio |
-| Sem sessão e-CAC, o scraper **apaga a mensagem** e nada reenfileira | A retentativa precisa de um dono (já decidido: Document Collector) |
-| Sessão, troca de perfil, status e upload são **reescritos em cada coletor** | Viram a base comum dos workers |
-| Só **Créditos DCTFWeb usa Selenium** (Moon remoto); **DCTF usa Chrome local** para HTML→PDF; os demais são HTTP | Duas imagens bastam: a padrão e uma com Chrome |
-| **DARF** usa outro serviço de sessão (session-manager) e um resolvedor de hCaptcha, além do Agnaldo e do SERPRO | São dependências extras do worker DARF |
-| No Document Collector, o **status da coleta tem vários escritores**: o scraper grava direto e o DC também recalcula | O worker passa a só informar; quem calcula o status é o DC |
-| O **ZIP é gerado dentro da requisição de callback** | O ZIP sai da requisição e vira um job |
-| **Extrações são só inseridas**: uma nova tentativa duplica as linhas | Nesta versão, a extração vai para um JSON no bucket com chave determinística: uma nova tentativa sobrescreve, não duplica |
-| **Nenhum callback tem autenticação nem identificador de tentativa** | Contrato novo, autenticado e com tentativa |
-| O AGuiar usa as mesmas tabelas `collected` e `collection_execution` e os mesmos callbacks | O DC atual continua no ar para o AGuiar; o DC v2 roda em release própria, no mesmo banco, com uma API nova e no schema próprio `agenor_v2`, sem escrever nas tabelas do DC atual |
-| O DC atual roda `alembic upgrade head` toda vez que o pod sobe (`entrypoint.sh`) | Se o v2 registrar migrações na mesma `alembic_version`, o DC atual não sobe mais no próximo restart. O v2 guarda a versão do Alembic dentro do schema `agenor_v2` |
+| Fato                                                                                                                | Consequência para o 2.0                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| O scraper processa **uma coleta por réplica**; com 6 réplicas, no máximo 6 coletas simultâneas                      | O limite atual de paralelismo é 6. É o ponto de partida dos limites do Launcher                                                                                                  |
+| Uma coleta pode durar horas (a mensagem é renovada na fila por até 4 h)                                             | Cada tipo precisa de um tempo máximo próprio                                                                                                                                     |
+| Sem sessão e-CAC, o scraper **apaga a mensagem** e nada reenfileira                                                 | A retentativa precisa de um dono (já decidido: Document Collector)                                                                                                               |
+| Sessão, troca de perfil, status e upload são **reescritos em cada coletor**                                         | Viram a base comum dos workers                                                                                                                                                   |
+| Só **Créditos DCTFWeb usa Selenium** (Moon remoto); **DCTF usa Chrome local** para HTML→PDF; os demais são HTTP     | Duas imagens bastam: a padrão e uma com Chrome                                                                                                                                   |
+| **DARF** usa outro serviço de sessão (session-manager) e um resolvedor de hCaptcha, além do Agnaldo e do SERPRO     | São dependências extras do worker DARF                                                                                                                                           |
+| No Document Collector, o **status da coleta tem vários escritores**: o scraper grava direto e o DC também recalcula | O worker passa a só informar; quem calcula o status é o DC                                                                                                                       |
+| O **ZIP é gerado dentro da requisição de callback**                                                                 | O ZIP sai da requisição e vira um job                                                                                                                                            |
+| **Extrações são só inseridas**: uma nova tentativa duplica as linhas                                                | Nesta versão, a extração vai para um JSON no bucket com chave determinística: uma nova tentativa sobrescreve, não duplica                                                        |
+| **Nenhum callback tem autenticação nem identificador de tentativa**                                                 | Contrato novo, autenticado e com tentativa                                                                                                                                       |
+| O AGuiar usa as mesmas tabelas `collected` e `collection_execution` e os mesmos callbacks                           | O DC atual continua no ar para o AGuiar; o DC v2 roda em release própria, no mesmo banco, com uma API nova e no schema próprio `agenor_v2`, sem escrever nas tabelas do DC atual |
+| O DC atual roda `alembic upgrade head` toda vez que o pod sobe (`entrypoint.sh`)                                    | Se o v2 registrar migrações na mesma `alembic_version`, o DC atual não sobe mais no próximo restart. O v2 guarda a versão do Alembic dentro do schema `agenor_v2`                |
 
 ### 3.1 Tentativa: a unidade de execução
 
@@ -332,40 +341,42 @@ Local → DEV e STG (com comparação lado a lado em STG) → deploy em PRD ao l
 
 **Parte A: para desenvolvimento e testes locais**
 
-| # | Pedido | Quando |
-|---|---|---|
-| A1 | ~~Confirmar a branch de partida~~ Não é mais pedido: partimos da branch mais atual de cada projeto (27/10) | — |
-| A2 | Procurador, certificado e CNPJs de teste | Antes do piloto (fase 3); alinhado durante as fases 1 e 2 (A0.8) |
-| A3 | Acesso aos proxies | Antes do piloto (fase 3); alinhado durante as fases 1 e 2 (A0.8) |
-| A4 | Acesso de teste ao Moon, ao session-manager e ao hCaptcha | Antes de Créditos DCTFWeb e DARF (fase 4) |
+| #   | Pedido                                                                                                     | Quando                                                           |
+| --- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| A1  | ~~Confirmar a branch de partida~~ Não é mais pedido: partimos da branch mais atual de cada projeto (27/10) | —                                                                |
+| A2  | Procurador, certificado e CNPJs de teste                                                                   | Antes do piloto (fase 3); alinhado durante as fases 1 e 2 (A0.8) |
+| A3  | Acesso aos proxies                                                                                         | Antes do piloto (fase 3); alinhado durante as fases 1 e 2 (A0.8) |
+| A4  | Acesso de teste ao Moon, ao session-manager e ao hCaptcha                                                  | Antes de Créditos DCTFWeb e DARF (fase 4)                        |
 
 **Já temos:** o esquema do banco (pelas migrações do código), os usuários de serviço do Agnaldo (os mesmos dos outros produtos) e o acesso aos repositórios. Fila e armazenamento rodam localmente.
 
 **Parte B: infra dos ambientes (última etapa; alinhada no decorrer do desenvolvimento, não agora)**
 
-| # | Pedido | Para quê |
-|---|---|---|
-| 1 | Namespace dos workers, com ResourceQuota | Isolar e limitar os Jobs |
-| 2 | ServiceAccount e Role para o Launcher: criar, listar, observar e apagar Jobs e pods, e ler logs, **só nesse namespace** | Launcher criar os pods |
-| 3 | Fila OCI nova para o 2.0 por ambiente: visibilidade de 15 min, retenção de 7 dias, 3 entregas, DLQ. Permissões: DC publica; Launcher lê, atualiza e apaga | Não colidir com a fila do scraper na virada |
-| 4 | Repositórios no Harbor: `agenor-launcher`, `agenor-worker`, `agenor-worker-chrome` | Imagens |
-| 5 | Pipelines no Bitbucket para os repositórios novos e chart Helm do Launcher | Build e deploy |
-| 6 | Usuários de serviço no Agnaldo para o Launcher e os workers, e a forma de o DC validar os tokens | Autenticação entre serviços |
-| 7 | Secrets: chave de API da OCI (montada como arquivo), bucket, usuários de serviço do Agnaldo, proxies, session-manager, hCaptcha | Credenciais |
-| 8 | Capacidade de nós (CPU e memória) para os picos de Jobs | Execução |
-| 9 | NetworkPolicies de saída dos workers | Segurança |
-| 10 | Migrações do banco como Job de hook do Helm, não no start do pod | Deploy seguro |
-| 11 | Usuário somente leitura no banco do company-service | Substituir o superusuário |
-| 12 | Ambientes DEV e STG para as releases do 2.0 | Validação |
-| 13 | ServiceMonitor para DC e Launcher, endpoint OTLP (Alloy) e coleta dos logs dos Jobs | Observabilidade |
-| 14 | Desligar o sweeper ativo da release `-apisix` do DC antes do 2.0 entrar em PRD | Ele pode republicar coletas do v2 na fila antiga (§3.13, item 4) |
+| #   | Pedido                                                                                                                                                    | Para quê                                                         |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 1   | Namespace dos workers, com ResourceQuota                                                                                                                  | Isolar e limitar os Jobs                                         |
+| 2   | ServiceAccount e Role para o Launcher: criar, listar, observar e apagar Jobs e pods, e ler logs, **só nesse namespace**                                   | Launcher criar os pods                                           |
+| 3   | Fila OCI nova para o 2.0 por ambiente: visibilidade de 15 min, retenção de 7 dias, 3 entregas, DLQ. Permissões: DC publica; Launcher lê, atualiza e apaga | Não colidir com a fila do scraper na virada                      |
+| 4   | Repositórios no Harbor: `agenor-launcher`, `agenor-worker`, `agenor-worker-chrome`                                                                        | Imagens                                                          |
+| 5   | Pipelines no Bitbucket para os repositórios novos e chart Helm do Launcher                                                                                | Build e deploy                                                   |
+| 6   | Usuários de serviço no Agnaldo para o Launcher e os workers, e a forma de o DC validar os tokens                                                          | Autenticação entre serviços                                      |
+| 7   | Secrets: chave de API da OCI (montada como arquivo), bucket, usuários de serviço do Agnaldo, proxies, session-manager, hCaptcha                           | Credenciais                                                      |
+| 8   | Capacidade de nós (CPU e memória) para os picos de Jobs                                                                                                   | Execução                                                         |
+| 9   | NetworkPolicies de saída dos workers                                                                                                                      | Segurança                                                        |
+| 10  | Migrações do banco como Job de hook do Helm, não no start do pod                                                                                          | Deploy seguro                                                    |
+| 11  | Usuário somente leitura no banco do company-service                                                                                                       | Substituir o superusuário                                        |
+| 12  | Ambientes DEV e STG para as releases do 2.0                                                                                                               | Validação                                                        |
+| 13  | ServiceMonitor para DC e Launcher, endpoint OTLP (Alloy) e coleta dos logs dos Jobs                                                                       | Observabilidade                                                  |
+| 14  | Desligar o sweeper ativo da release `-apisix` do DC antes do 2.0 entrar em PRD                                                                            | Ele pode republicar coletas do v2 na fila antiga (§3.13, item 4) |
 
 **Alertas ao cliente (não corrigimos, só avisamos):**
+
 - rotacionar as credenciais expostas no histórico Git;
 - sweeper ativo na release `-apisix` com código antigo;
 - `DEBUG_MODE` e vídeo do Moon em PRD;
 - superusuário do Postgres em ConfigMap;
 - heads do Alembic divergentes entre a release principal e a `-apisix` do DC, com migração no start do pod (§3.13, item 7).
+- o `bitbucket-pipelines.yml` do DC, que veio para o repositório do v2, faz build e deploy da release `document-collector-service` nos namespaces do DC atual e usa a chave do Sonar dele: antes de o v2 entrar no Bitbucket, o pipeline do v2 precisa de release, imagem e chave próprias (27/10).
 
 ### 3.11 Pendências
 
@@ -373,6 +384,7 @@ Local → DEV e STG (com comparação lado a lado em STG) → deploy em PRD ao l
 2. ~~As coletas do AGuiar continuam no Document Collector?~~ **Deixou de ser pergunta em 27/10.** O 2.0 é um produto novo, em schema próprio, e não depende do que o cliente fizer com o DC atual. O documento para o cliente informa a decisão em vez de perguntar.
 
 **Descartadas em 26/10:**
+
 - **Volumes e durações por tipo em PRD.** Começamos com os valores de hoje (6 coletas simultâneas, prazo de até 4 h) e calibramos com as métricas do próprio 2.0, primeiro no ambiente local e depois em STG.
 - **Quem chama os `consult_*`.** Eles continuam na API antiga nesta fase (§3.5).
 
@@ -382,30 +394,31 @@ Local → DEV e STG (com comparação lado a lado em STG) → deploy em PRD ao l
 
 **Linguagem:** o Agnes Collector é TypeScript/Node, e o Agenor continua em **Python**, porque as regras fiscais e os parsers que reaproveitamos estão em Python. Adotamos os padrões de arquitetura, contrato, infra e operação. O que é específico de TypeScript é traduzido:
 
-| Agnes Collector (TypeScript) | Agenor (Python) |
-|---|---|
-| Drizzle | SQLAlchemy e Alembic |
-| `async-retry` | tenacity |
-| `prom-client` | prometheus_client |
-| `withAgentAuth` | dependência do FastAPI |
+| Agnes Collector (TypeScript) | Agenor (Python)        |
+| ---------------------------- | ---------------------- |
+| Drizzle                      | SQLAlchemy e Alembic   |
+| `async-retry`                | tenacity               |
+| `prom-client`                | prometheus_client      |
+| `withAgentAuth`              | dependência do FastAPI |
 
 **Adotados:**
 
-| Padrão | Onde no plano |
-|---|---|
-| O Collector (aqui, o DC) é dono de todo o estado; os workers só executam e informam por REST | §3.2, §3.4 |
-| A tabela do banco é a fila de verdade; a OCI Queue só transporta o que está pronto; um despachante com lock e capacidade publica e só então marca como despachado | §3.4 |
-| Evento enxuto e versionado; o worker busca a entrada pelo identificador e descarta se estiver obsoleta | §3.2 |
-| Sinal de vida a cada 1 min com cancelamento; abandono detectado pelo banco (5 min e 60 min), sem depender da DLQ | §3.1, §3.4 |
-| Falha técnica (até 3) separada da retentativa de negócio (5, 15, 30, 60, 60 min…) | §3.4 |
-| Integração com o Agnaldo: usuário de serviço → token; reservar sessão, manter ativa, trocar perfil e sempre devolver. Estendido por nós: o mesmo token autentica as chamadas ao DC | §3.2, §3.6 |
-| Histórico de eventos com categoria, nome, autor e metadados, e `status_text` legível | §3.4 |
-| Chart Helm por serviço, `kubernetes/<serviço>/<cluster>/values*.yaml`, ConfigMap gerado dos values, Secrets via `envFrom`, migração como hook | §3.4, §3.10 |
-| Pipeline Bitbucket: Sonar e SBOM (Dependency-Track) em paralelo, build no Harbor com cache, `helm upgrade --install --wait`, PRD manual | §3.10 |
-| OTel para o Alloy, `/metrics` com ServiceMonitor | §3.8 |
-| Documentação em ADRs, por fase, e um `infra.md` com só o que o código precisa do ambiente | [`docs/arquitetura/`](arquitetura/README.md) |
+| Padrão                                                                                                                                                                             | Onde no plano                                |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| O Collector (aqui, o DC) é dono de todo o estado; os workers só executam e informam por REST                                                                                       | §3.2, §3.4                                   |
+| A tabela do banco é a fila de verdade; a OCI Queue só transporta o que está pronto; um despachante com lock e capacidade publica e só então marca como despachado                  | §3.4                                         |
+| Evento enxuto e versionado; o worker busca a entrada pelo identificador e descarta se estiver obsoleta                                                                             | §3.2                                         |
+| Sinal de vida a cada 1 min com cancelamento; abandono detectado pelo banco (5 min e 60 min), sem depender da DLQ                                                                   | §3.1, §3.4                                   |
+| Falha técnica (até 3) separada da retentativa de negócio (5, 15, 30, 60, 60 min…)                                                                                                  | §3.4                                         |
+| Integração com o Agnaldo: usuário de serviço → token; reservar sessão, manter ativa, trocar perfil e sempre devolver. Estendido por nós: o mesmo token autentica as chamadas ao DC | §3.2, §3.6                                   |
+| Histórico de eventos com categoria, nome, autor e metadados, e `status_text` legível                                                                                               | §3.4                                         |
+| Chart Helm por serviço, `kubernetes/<serviço>/<cluster>/values*.yaml`, ConfigMap gerado dos values, Secrets via `envFrom`, migração como hook                                      | §3.4, §3.10                                  |
+| Pipeline Bitbucket: Sonar e SBOM (Dependency-Track) em paralelo, build no Harbor com cache, `helm upgrade --install --wait`, PRD manual                                            | §3.10                                        |
+| OTel para o Alloy, `/metrics` com ServiceMonitor                                                                                                                                   | §3.8                                         |
+| Documentação em ADRs, por fase, e um `infra.md` com só o que o código precisa do ambiente                                                                                          | [`docs/arquitetura/`](arquitetura/README.md) |
 
 **Não copiados (melhorados):**
+
 - autenticação com `base64(agent_id)`;
 - variáveis de ambiente sem validação;
 - logs em texto livre;
@@ -413,12 +426,14 @@ Local → DEV e STG (com comparação lado a lado em STG) → deploy em PRD ao l
 - token do Agnaldo em arquivo no disco.
 
 **Não adotados agora:**
+
 - o Temporal, porque não há agendamento recorrente nesta fase (§3.4);
 - o mecanismo novo atrás de uma chave de ambiente, porque o 2.0 roda em releases próprias e a versão atual não recebe código novo (§3.9).
 
 **Mudanças em decisões já validadas (26/10):**
+
 1. **A concorrência passa a ser decidida pelo Document Collector** (despachante), não pelo Launcher. O Launcher fica só com um teto de segurança do cluster. Com isso, não são necessários canais por tipo na fila. Aceita conforme as recomendações.
-2. **A autenticação entre serviços passa a ser por usuários de serviço do Agnaldo**, não por clients no Keycloak. Aprovada explicitamente.
+2. **A autenticação entre serviços passa a ser por usuários de serviço do Agnaldo**, não por clients no Keycloak. Precisa rever, quando for trabalhar vamos analisar como é, e se da certo, por que a troca? se o sistema utiliza Keycloak qual o motivo de mudar?.
 3. **Duas releases no mesmo banco, em vez de chave de virada** (refinamento de 26/10). O DC v2 sobe ao lado do atual. Aprovada explicitamente. A `alembic_version_v2` da primeira versão foi substituída em 27/10 pelo schema `agenor_v2`, com a `alembic_version` dentro dele ([ADR-001](arquitetura/adr-001-isolamento-no-schema-agenor-v2.md)).
 
 **eSocial:** o Agnes Collector **é** o coletor de eSocial (RPA com Puppeteer, sessões `sessao-esocial` do Agnaldo). Isso explica a caixa "eSocial Collector" no desenho do cliente. Fica fora desta fase, como combinado. A integração dele como mais um "motor" do Agenor entra depois.
@@ -426,6 +441,7 @@ Local → DEV e STG (com comparação lado a lado em STG) → deploy em PRD ao l
 ### 3.13 Pontos de atenção
 
 Lista única dos pontos que podem quebrar algo fora do Agenor 2.0 ou travar o plano. O maior é o **banco compartilhado**: com o modelo de duas releases, passam a escrever no mesmo Postgres de PRD (`hiperautomacao_document_collector_prd`):
+
 - o **DC atual**, que atende o AGuiar, o scraper e a API antiga;
 - o **DC v2**, que atende o Agenor 2.0;
 - a release **`-apisix`** do DC, com código de 30/07 e o sweeper do orquestrador em modo **ativo**.
@@ -434,41 +450,42 @@ Lista única dos pontos que podem quebrar algo fora do Agenor 2.0 ou travar o pl
 
 **Banco compartilhado com o AGuiar e com as outras releases**
 
-| # | Ponto | Por que importa | Como tratamos | Status |
-|---|---|---|---|---|
-| 1 | O AGuiar usa as mesmas tabelas (`collected`, `collection_execution`, eventos) e os mesmos callbacks do DC atual | Qualquer mudança de estrutura ou de comportamento no DC atual pode quebrar outro produto | DC atual intacto, em release própria; o v2 escreve só no schema `agenor_v2`; verificação de que o DC atual sobe, reinicia e funciona com o schema presente (A1.15) | tratado |
-| 2 | Coluna nova obrigatória quebra o código antigo | O DC atual e a `-apisix` inserem linhas sem conhecer as colunas do v2; uma coluna `NOT NULL` sem valor padrão faz esses inserts falharem | O v2 não altera as tabelas do `public`; tudo o que é do v2 fica no schema `agenor_v2` (27/10) | tratado |
-| 3 | Os status são `Enum` no código antigo (`collection_models.py:89,123`) | Se o v2 gravar em `collected.status` ou `collection_execution.status` um valor que o código antigo não conhece (ex.: um status novo), as telas e rotas antigas que leem essa linha dão erro | O v2 não grava nas tabelas do `public`; os status novos (`CANCELLED`, `NO_SESSION`, `INFRA_FAILED`…) ficam no schema `agenor_v2` | tratado |
-| 4 | Os sweepers antigos olham **todas** as execuções do banco | O `find_stuck_collected_ids` (`orchestrator_repository.py`) pega qualquer execução `PENDING` ou `PROCESSING` parada, sem saber de onde veio. Na `-apisix`, em modo ativo, ele **republica a coleta na fila antiga** | O v2 não grava nas tabelas do DC atual (§3.4), então os sweepers antigos não enxergam as coletas dele. O alerta sobre o sweeper ativo da `-apisix` continua | tratado (detalhe no ADR) |
-| 5 | A tabela `collection_attempt` já é usada pelo orquestrador antigo | Se o v2 reaproveitasse essa tabela, os sweepers antigos continuariam gravando nela (o shadow registra tentativas a cada 2 h) | O v2 usa uma **tabela de tentativas própria**, sem reaproveitar `collection_attempt` (§3.1) | tratado |
-| 6 | O DC atual roda `alembic upgrade head` toda vez que sobe | Se o v2 registrar revisões na mesma `alembic_version`, o DC atual deixa de subir e derruba o AGuiar | Versão do Alembic do v2 dentro do schema `agenor_v2` e teste de restart do DC atual na fase 1 (A1.15) | tratado |
-| 7 | A `-apisix` já tem heads de migração divergentes (diagnóstico, risco #6) | Pode deixar de subir num restart, independente do v2 | Alerta ao cliente; o v2 não depende dela | cliente |
-| 8 | As listagens e consultas antigas mostrariam coletas do v2 | `GET /coleta-documentos`, `/extracoes` e `consult_*` leem as tabelas do DC atual | Com o v2 isolado (§3.4), as coletas do 2.0 não aparecem na API antiga; são consultadas pela API do v2 | tratado |
+| #   | Ponto                                                                                                           | Por que importa                                                                                                                                                                                                     | Como tratamos                                                                                                                                                      | Status                   |
+| --- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------ |
+| 1   | O AGuiar usa as mesmas tabelas (`collected`, `collection_execution`, eventos) e os mesmos callbacks do DC atual | Qualquer mudança de estrutura ou de comportamento no DC atual pode quebrar outro produto                                                                                                                            | DC atual intacto, em release própria; o v2 escreve só no schema `agenor_v2`; verificação de que o DC atual sobe, reinicia e funciona com o schema presente (A1.15) | tratado                  |
+| 2   | Coluna nova obrigatória quebra o código antigo                                                                  | O DC atual e a `-apisix` inserem linhas sem conhecer as colunas do v2; uma coluna `NOT NULL` sem valor padrão faz esses inserts falharem                                                                            | O v2 não altera as tabelas do `public`; tudo o que é do v2 fica no schema `agenor_v2` (27/10)                                                                      | tratado                  |
+| 3   | Os status são `Enum` no código antigo (`collection_models.py:89,123`)                                           | Se o v2 gravar em `collected.status` ou `collection_execution.status` um valor que o código antigo não conhece (ex.: um status novo), as telas e rotas antigas que leem essa linha dão erro                         | O v2 não grava nas tabelas do `public`; os status novos (`CANCELLED`, `NO_SESSION`, `INFRA_FAILED`…) ficam no schema `agenor_v2`                                   | tratado                  |
+| 4   | Os sweepers antigos olham **todas** as execuções do banco                                                       | O `find_stuck_collected_ids` (`orchestrator_repository.py`) pega qualquer execução `PENDING` ou `PROCESSING` parada, sem saber de onde veio. Na `-apisix`, em modo ativo, ele **republica a coleta na fila antiga** | O v2 não grava nas tabelas do DC atual (§3.4), então os sweepers antigos não enxergam as coletas dele. O alerta sobre o sweeper ativo da `-apisix` continua        | tratado (detalhe no ADR) |
+| 5   | A tabela `collection_attempt` já é usada pelo orquestrador antigo                                               | Se o v2 reaproveitasse essa tabela, os sweepers antigos continuariam gravando nela (o shadow registra tentativas a cada 2 h)                                                                                        | O v2 usa uma **tabela de tentativas própria**, sem reaproveitar `collection_attempt` (§3.1)                                                                        | tratado                  |
+| 6   | O DC atual roda `alembic upgrade head` toda vez que sobe                                                        | Se o v2 registrar revisões na mesma `alembic_version`, o DC atual deixa de subir e derruba o AGuiar                                                                                                                 | Versão do Alembic do v2 dentro do schema `agenor_v2` e teste de restart do DC atual na fase 1 (A1.15)                                                              | tratado                  |
+| 7   | A `-apisix` já tem heads de migração divergentes (diagnóstico, risco #6)                                        | Pode deixar de subir num restart, independente do v2                                                                                                                                                                | Alerta ao cliente; o v2 não depende dela                                                                                                                           | cliente                  |
+| 8   | As listagens e consultas antigas mostrariam coletas do v2                                                       | `GET /coleta-documentos`, `/extracoes` e `consult_*` leem as tabelas do DC atual                                                                                                                                    | Com o v2 isolado (§3.4), as coletas do 2.0 não aparecem na API antiga; são consultadas pela API do v2                                                              | tratado                  |
 
 **Fora do banco**
 
-| # | Ponto | Por que importa | Como tratamos | Status |
-|---|---|---|---|---|
-| 9 | Credenciais expostas no histórico Git | Chave OCI e senhas do Agnaldo vazadas continuam válidas até serem trocadas | Alerta ao cliente para rotacionar; o `agenor-v2` nasce sem histórico | cliente |
-| 10 | Superusuário do banco do company-service em ConfigMap | Acesso total a outro banco com senha visível | Pedido 11: usuário somente leitura em Secret | cliente |
-| 11 | `DEBUG_MODE` e vídeo do navegador em PRD | Dados fiscais gravados em vídeo e em logs | Alerta ao cliente; o 2.0 nasce sem isso | cliente |
-| 12 | O cliente continua mudando o scraper durante o 2.0 | Os workers portados ficam desatualizados | Aplicar os diffs a partir do commit registrado antes de portar cada tipo | tratado (processo) |
-| 13 | Branch de partida | O ponto de partida pode mudar | Decidido em 27/10: branch mais atual de cada projeto, registrada no `ORIGEM.md`; mudanças posteriores entram por diff | tratado |
-| 14 | Prazo do cliente: acessos de teste e infra dos ambientes | Os acessos de teste aos portais atrasam o M2; a infra atrasa a fase 6. O M1 não depende do cliente | Acessos alinhados durante as fases 1 e 2; infra alinhada com antecedência antes da fase 6 (§3.10) | cliente |
-| 15 | Validação do token do Agnaldo no DC | Bloqueia a autenticação entre serviços | Resolver no início da fase 1 | verificar |
-| 16 | Limite de sessões do Agnaldo por procurador | Mais pods simultâneos do que sessões disponíveis vira `NO_SESSION` em série | Começar com 6 simultâneos, como hoje, e subir medindo | tratado |
-| 17 | A virada por rota depende do contrato e do gateway | Só é troca de rota se o DC v2 expuser aos consumidores do Agenor o mesmo contrato de solicitação e consulta do DC atual. O front e outros consumidores chegam pelo Agnaldo/APISIX com os paths do DC, e essa rota não é nossa | API do consumidor no DC v2 com o mesmo contrato (A1.1 e A1.16); mudança de rota pedida ao cliente (A6.9) | verificar + cliente |
-| 18 | Segredos no código exportado | A exportação tira o histórico, mas não credenciais e URLs de produção que estejam no código atual | Varredura de segredos antes do primeiro commit do `agenor-v2` (A0.1) | tratado |
-| 19 | Quem consome as extrações é desconhecido | Os `consult_*` e o `/extracoes` não são chamados pelo front nem pelo scraper. Depois da virada, eles deixam de receber dados das coletas novas, porque o 2.0 guarda a extração só em JSON no bucket | Antes da virada (fase 6), identificar quem chama essas rotas pelos logs e alinhar com o cliente; as tabelas no `agenor_v2` e a API de consulta entram quando houver consumidor | verificar + cliente |
-| 20 | Instabilidade dos portais da Receita | A comparação scraper × 2.0 pode falhar por motivo externo | Comparar por amostras repetidas | tratado (processo) |
-| 21 | Moon limitado a 4 sessões; proxies sem limite medido | Créditos DCTFWeb e a coleta em geral podem falhar em série se o despachante subir os limites sem medir | Limites do despachante por tipo, começando pelos de hoje (§3.4) | tratado |
-| 22 | Diferenças entre o ambiente local e os clusters | Rede, cotas, permissões e segredos só aparecem na fase 6 | `infra.md` com tudo o que o código precisa, charts escritos na fase 2, DEV antes de STG e os 8 cenários repetidos no cluster (A6.3) | tratado (processo) |
+| #   | Ponto                                                    | Por que importa                                                                                                                                                                                                               | Como tratamos                                                                                                                                                                  | Status              |
+| --- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------- |
+| 9   | Credenciais expostas no histórico Git                    | Chave OCI e senhas do Agnaldo vazadas continuam válidas até serem trocadas                                                                                                                                                    | Alerta ao cliente para rotacionar; o `agenor-v2` nasce sem histórico                                                                                                           | cliente             |
+| 10  | Superusuário do banco do company-service em ConfigMap    | Acesso total a outro banco com senha visível                                                                                                                                                                                  | Pedido 11: usuário somente leitura em Secret                                                                                                                                   | cliente             |
+| 11  | `DEBUG_MODE` e vídeo do navegador em PRD                 | Dados fiscais gravados em vídeo e em logs                                                                                                                                                                                     | Alerta ao cliente; o 2.0 nasce sem isso                                                                                                                                        | cliente             |
+| 12  | O cliente continua mudando o scraper durante o 2.0       | Os workers portados ficam desatualizados                                                                                                                                                                                      | Aplicar os diffs a partir do commit registrado antes de portar cada tipo                                                                                                       | tratado (processo)  |
+| 13  | Branch de partida                                        | O ponto de partida pode mudar                                                                                                                                                                                                 | Decidido em 27/10: branch mais atual de cada projeto, registrada no `ORIGEM.md`; mudanças posteriores entram por diff                                                          | tratado             |
+| 14  | Prazo do cliente: acessos de teste e infra dos ambientes | Os acessos de teste aos portais atrasam o M2; a infra atrasa a fase 6. O M1 não depende do cliente                                                                                                                            | Acessos alinhados durante as fases 1 e 2; infra alinhada com antecedência antes da fase 6 (§3.10)                                                                              | cliente             |
+| 15  | Validação do token do Agnaldo no DC                      | Bloqueia a autenticação entre serviços                                                                                                                                                                                        | Resolver no início da fase 1                                                                                                                                                   | verificar           |
+| 16  | Limite de sessões do Agnaldo por procurador              | Mais pods simultâneos do que sessões disponíveis vira `NO_SESSION` em série                                                                                                                                                   | Começar com 6 simultâneos, como hoje, e subir medindo                                                                                                                          | tratado             |
+| 17  | A virada por rota depende do contrato e do gateway       | Só é troca de rota se o DC v2 expuser aos consumidores do Agenor o mesmo contrato de solicitação e consulta do DC atual. O front e outros consumidores chegam pelo Agnaldo/APISIX com os paths do DC, e essa rota não é nossa | API do consumidor no DC v2 com o mesmo contrato (A1.1 e A1.16); mudança de rota pedida ao cliente (A6.9)                                                                       | verificar + cliente |
+| 18  | Segredos no código exportado                             | A exportação tira o histórico, mas não credenciais e URLs de produção que estejam no código atual                                                                                                                             | Varredura de segredos antes do primeiro commit do `agenor-v2` (A0.1)                                                                                                           | tratado             |
+| 19  | Quem consome as extrações é desconhecido                 | Os `consult_*` e o `/extracoes` não são chamados pelo front nem pelo scraper. Depois da virada, eles deixam de receber dados das coletas novas, porque o 2.0 guarda a extração só em JSON no bucket                           | Antes da virada (fase 6), identificar quem chama essas rotas pelos logs e alinhar com o cliente; as tabelas no `agenor_v2` e a API de consulta entram quando houver consumidor | verificar + cliente |
+| 20  | Instabilidade dos portais da Receita                     | A comparação scraper × 2.0 pode falhar por motivo externo                                                                                                                                                                     | Comparar por amostras repetidas                                                                                                                                                | tratado (processo)  |
+| 21  | Moon limitado a 4 sessões; proxies sem limite medido     | Créditos DCTFWeb e a coleta em geral podem falhar em série se o despachante subir os limites sem medir                                                                                                                        | Limites do despachante por tipo, começando pelos de hoje (§3.4)                                                                                                                | tratado             |
+| 22  | Diferenças entre o ambiente local e os clusters          | Rede, cotas, permissões e segredos só aparecem na fase 6                                                                                                                                                                      | `infra.md` com tudo o que o código precisa, charts escritos na fase 2, DEV antes de STG e os 8 cenários repetidos no cluster (A6.3)                                            | tratado (processo)  |
 
 Os itens marcados **verificar** são cobertos pelas atividades A1.2, A1.15, A1.16 e, antes da virada, pela fase 6. Os marcados **cliente** entram na mensagem de pedidos e alertas da fase 0 (A0.7).
 
 ### Validações
 
 26/10: as 8 recomendações foram aceitas como estão:
+
 1. tentativa como unidade de execução;
 2. mensagem só com identificadores;
 3. Launcher com Kubernetes Jobs;
@@ -485,6 +502,7 @@ Sujeitas a ajuste pelos padrões do Agnes Collector.
 ## 4. Roadmap
 
 **Princípios:**
+
 1. **Alicerce primeiro.** O Document Collector, a fila, o Launcher e a base dos workers funcionam de ponta a ponta com um worker de teste. Depois, os coletores entram um a um sobre esse alicerce.
 2. **Por etapas (27/10).** O foco agora é o alicerce: base, arquitetura, estrutura, segurança e padrões. Cada processo (coletor, extração, planilhas, consultas) é detalhado, validado e ajustado na sua vez, sobre o alicerce pronto. O plano não antecipa esse detalhe.
 3. **Local primeiro (26/10).** Tudo é desenvolvido, validado e testado localmente: o alicerce, os coletores e a comparação com o scraper. A subida para os ambientes (DEV, STG e PRD) é a **última etapa**. Não há pedido ao cliente para começar: partimos da branch mais atual de cada projeto (27/10). Os acessos de teste aos portais e a infra dos ambientes são alinhados no decorrer do desenvolvimento (§3.10).
@@ -506,22 +524,23 @@ As fases 1 e 2 correm em paralelo, depois que o contrato da API (§3.2) estiver 
 
 ### Ambiente local
 
-| Peça | Como fica no ambiente local |
-|---|---|
-| Banco | Postgres local com o esquema do DC atual, criado pelas migrações do próprio código, e dados de exemplo gerados por nós |
-| DC atual | Rodando localmente sobre o mesmo banco, para os testes de regressão e de isolamento |
-| Cluster | Kubernetes local (kind ou k3d) para os Jobs do Launcher |
-| Fila | **Local.** O DC v2 e o Launcher falam com a fila por uma interface com dois adaptadores: o da OCI Queue, usado nos ambientes, e um local, usado no desenvolvimento e nos testes. O local simula visibilidade, reentrega e apagamento, para reproduzir os 8 cenários do M1. A fila existente não é usada, porque é consumida pelo scraper. O adaptador da OCI é validado em DEV (fase 6) |
-| Bucket | Armazenamento compatível com S3 rodando localmente; o bucket da OCI só nos ambientes |
-| Agnaldo | O real, com os usuários de serviço que já temos dos outros produtos |
-| Portais, proxies, Moon, session-manager, hCaptcha | Os reais, com procurador, certificado e CNPJs de teste. Os acessos são alinhados antes do piloto (fase 3) e dos coletores que precisam deles (fase 4) |
-| Scraper | Rodando localmente com as mesmas entradas, para a comparação |
+| Peça                                              | Como fica no ambiente local                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Banco                                             | Postgres local com o esquema do DC atual, criado pelas migrações do próprio código, e dados de exemplo gerados por nós                                                                                                                                                                                                                                                                  |
+| DC atual                                          | Rodando localmente sobre o mesmo banco, para os testes de regressão e de isolamento                                                                                                                                                                                                                                                                                                     |
+| Cluster                                           | Kubernetes local (kind ou k3d) para os Jobs do Launcher                                                                                                                                                                                                                                                                                                                                 |
+| Fila                                              | **Local.** O DC v2 e o Launcher falam com a fila por uma interface com dois adaptadores: o da OCI Queue, usado nos ambientes, e um local, usado no desenvolvimento e nos testes. O local simula visibilidade, reentrega e apagamento, para reproduzir os 8 cenários do M1. A fila existente não é usada, porque é consumida pelo scraper. O adaptador da OCI é validado em DEV (fase 6) |
+| Bucket                                            | Armazenamento compatível com S3 rodando localmente; o bucket da OCI só nos ambientes                                                                                                                                                                                                                                                                                                    |
+| Agnaldo                                           | O real, com os usuários de serviço que já temos dos outros produtos                                                                                                                                                                                                                                                                                                                     |
+| Portais, proxies, Moon, session-manager, hCaptcha | Os reais, com procurador, certificado e CNPJs de teste. Os acessos são alinhados antes do piloto (fase 3) e dos coletores que precisam deles (fase 4)                                                                                                                                                                                                                                   |
+| Scraper                                           | Rodando localmente com as mesmas entradas, para a comparação                                                                                                                                                                                                                                                                                                                            |
 
 ### Fase 0: preparação e ambiente local
 
 **Objetivo:** ter onde trabalhar e pedir cedo o que depende do cliente.
 
 **Entregas:**
+
 - Pasta de trabalho `agenor-v2` com **repositórios separados**, no padrão do cliente (decidido em 27/10). A pasta reúne o contexto, e o repositório dela guarda só a documentação:
   ```
   agenor-v2/                     repositório de docs: README, AGENTS.md, docs/ (plano, contexto, diagnóstico, cliente/, arquitetura/)
@@ -532,13 +551,14 @@ As fases 1 e 2 correm em paralelo, depois que o contrato da API (§3.2) estiver 
     referencia/                  snapshots do scraper e do download service, fora do Git, só para consulta
   ```
   Um monorepo, como o do Agnes Collector, traria ganhos (contrato num PR só), mas seguimos o padrão de repositórios separados do Agenor. O `agenor-common` compensa a parte do contrato.
-- CI de qualidade em cada projeto: lint, testes (hoje não rodam), Sonar e SBOM, no formato do pipeline do Agnes Collector. Build e deploy ficam para a fase 6.
+- ~~CI de qualidade em cada projeto~~ Fora por enquanto (27/10): pipelines e Sonar são infra do cliente e não são alterados por nós. A verificação é o `verify.sh` de cada repositório, rodado localmente; o CI entra quando for combinado com o cliente.
 - `docs/arquitetura/`: a §3 convertida em ADRs e um `infra.md` com só o que o código precisa do ambiente.
 - **Ambiente local** montado (tabela acima).
 - **Documento enviado ao cliente** (`ag-capital/agenor/entregaveis/`), com os alertas.
 - **Acessos de teste** (§3.10, A2 e A3) em alinhamento, para estarem prontos antes do piloto. A infra dos ambientes (parte B) fica para a fase 6.
 
 **Critério de saída (M0):**
+
 - o repositório compila e os testes atuais passam;
 - o ambiente local sobe o DC atual sobre o banco local.
 
@@ -549,6 +569,7 @@ As fases 1 e 2 correm em paralelo, depois que o contrato da API (§3.2) estiver 
 **Objetivo:** o DC v2 passa a ser o orquestrador do desenho novo, sem afetar o DC atual.
 
 **Entregas:**
+
 - Migrações no schema `agenor_v2` (coleta, tentativa, itens, histórico de eventos e `status_text`), com a versão do Alembic dentro do schema.
 - Chart da release própria do DC v2, com a migração como hook do Helm.
 - **API do consumidor** com o mesmo contrato de solicitação e consulta do DC atual, para que a virada seja só troca de rota (§3.13, item 17).
@@ -562,6 +583,7 @@ As fases 1 e 2 correm em paralelo, depois que o contrato da API (§3.2) estiver 
 - **Verificação de isolamento:** o DC atual sobe, reinicia e funciona com o schema `agenor_v2` presente, e não enxerga as coletas do v2.
 
 **Critério de saída, no ambiente local:**
+
 - O DC v2 roda ao lado do DC atual, no mesmo banco, e o DC atual funciona igual, inclusive depois de reiniciar.
 - Uma coleta pedida pela API do consumidor do DC v2 gera uma tentativa, é despachada e aparece na fila local no formato novo.
 
@@ -572,6 +594,7 @@ As fases 1 e 2 correm em paralelo, depois que o contrato da API (§3.2) estiver 
 **Objetivo:** o Launcher transforma a mensagem em um Job e acompanha até o fim.
 
 **Entregas:**
+
 - Projeto `agenor-launcher` com:
   - consumo da fila;
   - catálogo de tipos;
@@ -586,16 +609,16 @@ As fases 1 e 2 correm em paralelo, depois que o contrato da API (§3.2) estiver 
 
 **Critério de saída (M1, alicerce pronto):** no ambiente local, com o cluster local e o worker de teste, todos os cenários abaixo se comportam como o desenho manda:
 
-| Cenário | Resultado esperado |
-|---|---|
-| Sucesso | Coleta `FINISHED` |
-| Erro recuperável | Nova tentativa com espera |
-| Erro não recuperável | `FAILED` imediato |
-| Pod morto no meio | Abandono detectado, nova tentativa |
-| Prazo estourado | `TIMED_OUT`, nova tentativa |
-| Mensagem entregue duas vezes | Uma execução só |
-| Launcher reiniciado no meio | Nada perdido, nada duplicado |
-| Capacidade cheia | O resto espera no banco |
+| Cenário                      | Resultado esperado                 |
+| ---------------------------- | ---------------------------------- |
+| Sucesso                      | Coleta `FINISHED`                  |
+| Erro recuperável             | Nova tentativa com espera          |
+| Erro não recuperável         | `FAILED` imediato                  |
+| Pod morto no meio            | Abandono detectado, nova tentativa |
+| Prazo estourado              | `TIMED_OUT`, nova tentativa        |
+| Mensagem entregue duas vezes | Uma execução só                    |
+| Launcher reiniciado no meio  | Nada perdido, nada duplicado       |
+| Capacidade cheia             | O resto espera no banco            |
 
 **Depende do cliente:** nada; fila e armazenamento são locais.
 
@@ -604,6 +627,7 @@ As fases 1 e 2 correm em paralelo, depois que o contrato da API (§3.2) estiver 
 **Objetivo:** a base comum pronta e provada com um coletor real.
 
 **Entregas:**
+
 - `agenor-workers/core`:
   - entrada e descarte de tentativa obsoleta;
   - sinal de vida e cancelamento;
@@ -626,18 +650,19 @@ As fases 1 e 2 correm em paralelo, depois que o contrato da API (§3.2) estiver 
 
 **Ordem**, do menor risco para o maior, para que a base amadureça antes dos coletores pesados:
 
-| # | Worker | Por que nessa posição |
-|---|---|---|
-| 1 | DIRF | Pequeno, só HTTP |
-| 2 | GPS (CNPJ, CEI, filiais) | Médio; fluxo próprio da Dataprev |
-| 3 | PER/DCOMP e PER/DCOMP Consultor | Inclui o leitor de PDFs que hoje usa o SQL livre |
-| 4 | DCTF | Exige a imagem com Chrome |
-| 5 | Créditos DCTFWeb | Exige o Moon (Selenium remoto) |
-| 6 | DARF | Session-manager, hCaptcha e SERPRO; cerca de 3,6 mil linhas |
-| 7 | DCTFWeb | O maior (cerca de 3 mil linhas mais o parser); mais regras fiscais |
-| — | ZIP | Pode entrar a qualquer momento depois do piloto |
+| #   | Worker                          | Por que nessa posição                                              |
+| --- | ------------------------------- | ------------------------------------------------------------------ |
+| 1   | DIRF                            | Pequeno, só HTTP                                                   |
+| 2   | GPS (CNPJ, CEI, filiais)        | Médio; fluxo próprio da Dataprev                                   |
+| 3   | PER/DCOMP e PER/DCOMP Consultor | Inclui o leitor de PDFs que hoje usa o SQL livre                   |
+| 4   | DCTF                            | Exige a imagem com Chrome                                          |
+| 5   | Créditos DCTFWeb                | Exige o Moon (Selenium remoto)                                     |
+| 6   | DARF                            | Session-manager, hCaptcha e SERPRO; cerca de 3,6 mil linhas        |
+| 7   | DCTFWeb                         | O maior (cerca de 3 mil linhas mais o parser); mais regras fiscais |
+| —   | ZIP                             | Pode entrar a qualquer momento depois do piloto                    |
 
 **Para cada worker:**
+
 - porta o fluxo e os parsers atuais;
 - usa a chave padrão no bucket;
 - tem testes dos parsers;
@@ -656,6 +681,7 @@ Decidido em 27/10: as tabelas de extração no `agenor_v2`, a API de consulta e 
 **Objetivo:** levar aos ambientes o que já foi validado localmente e virar a produção.
 
 **Entregas:**
+
 - Infra dos ambientes pronta (§3.10, parte B).
 - Pipeline de build e deploy: imagens no Harbor e `helm upgrade --install`.
 - **DEV:** DC v2 em release própria ao lado do atual, Launcher e workers. Os 8 cenários do M1 são repetidos no cluster.
@@ -667,6 +693,7 @@ Decidido em 27/10: as tabelas de extração no `agenor_v2`, a API de consulta e 
 - **Roteiro da virada e da volta**, ensaiado em STG.
 
 **Passos em PRD (§3.9):**
+
 1. Deploy do Agenor 2.0 em PRD (DC v2, Launcher e workers), ao lado da versão atual.
 2. Apontar os consumidores do Agenor para o DC v2 (M5). O que já estava na versão atual termina lá.
 3. Janela de observação com a versão atual no ar, pronta para voltar.
@@ -676,29 +703,29 @@ Decidido em 27/10: as tabelas de extração no `agenor_v2`, a API de consulta e 
 
 ### Marcos
 
-| Marco | Significa | Fase |
-|---|---|---|
-| **M0** | Repositório e ambiente local prontos, CI rodando, pedidos enviados | 0 |
+| Marco  | Significa                                                                                                                 | Fase  |
+| ------ | ------------------------------------------------------------------------------------------------------------------------- | ----- |
+| **M0** | Repositório e ambiente local prontos, CI rodando, pedidos enviados                                                        | 0     |
 | **M1** | **Alicerce pronto:** DC, fila, Launcher e Job funcionando ponta a ponta no ambiente local, com todos os cenários de falha | 1 e 2 |
-| **M2** | Primeiro coletor real (Fontes Pagadoras) ponta a ponta, local, contra o portal real | 3 |
-| **M3** | Todos os tipos validados localmente | 4 |
-| **M4** | DEV e STG validados, com a comparação em STG | 6 |
-| **M5** | Produção rodando no 2.0 | 6 |
-| **M6** | Scraper desligado | 6 |
+| **M2** | Primeiro coletor real (Fontes Pagadoras) ponta a ponta, local, contra o portal real                                       | 3     |
+| **M3** | Todos os tipos validados localmente                                                                                       | 4     |
+| **M4** | DEV e STG validados, com a comparação em STG                                                                              | 6     |
+| **M5** | Produção rodando no 2.0                                                                                                   | 6     |
+| **M6** | Scraper desligado                                                                                                         | 6     |
 
 ### Riscos do roadmap
 
 Só os que afetam prazo.
 
-| Risco | Efeito | Como tratamos |
-|---|---|---|
-| Acessos de teste aos portais | Atrasam M2 e parte da fase 4 | O M1 não depende deles (fila, bucket e Agnaldo já resolvidos). Pedidos alinhados durante as fases 1 e 2 (§3.10, A2 a A4) |
-| Prazo da infra dos ambientes | Atrasa M4 | Alinhada no decorrer do desenvolvimento, com antecedência suficiente antes da fase 6 (§3.10, parte B) |
-| Diferenças entre o ambiente local e os clusters | Surpresas na fase 6 (rede, cotas, permissões) | `infra.md` com tudo o que o código precisa, charts escritos na fase 2 e DEV antes de STG |
-| O cliente continua alterando o scraper durante o 2.0 | Os workers portados ficam desatualizados | Aplicar os diffs a partir do commit registrado antes de portar cada tipo |
-| Instabilidade dos portais da Receita | A comparação falha por motivo externo | Comparar por amostras repetidas, não por uma execução só |
-| Validação do token do Agnaldo no DC | Bloqueia a autenticação | Resolver no início da fase 1 |
-| Sweeper ativo da `-apisix` republicar coletas do v2 na fila antiga | A mesma coleta roda no scraper e no 2.0 | v2 isolado das tabelas do DC atual (§3.4); verificação em STG na fase 6 |
+| Risco                                                              | Efeito                                        | Como tratamos                                                                                                            |
+| ------------------------------------------------------------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Acessos de teste aos portais                                       | Atrasam M2 e parte da fase 4                  | O M1 não depende deles (fila, bucket e Agnaldo já resolvidos). Pedidos alinhados durante as fases 1 e 2 (§3.10, A2 a A4) |
+| Prazo da infra dos ambientes                                       | Atrasa M4                                     | Alinhada no decorrer do desenvolvimento, com antecedência suficiente antes da fase 6 (§3.10, parte B)                    |
+| Diferenças entre o ambiente local e os clusters                    | Surpresas na fase 6 (rede, cotas, permissões) | `infra.md` com tudo o que o código precisa, charts escritos na fase 2 e DEV antes de STG                                 |
+| O cliente continua alterando o scraper durante o 2.0               | Os workers portados ficam desatualizados      | Aplicar os diffs a partir do commit registrado antes de portar cada tipo                                                 |
+| Instabilidade dos portais da Receita                               | A comparação falha por motivo externo         | Comparar por amostras repetidas, não por uma execução só                                                                 |
+| Validação do token do Agnaldo no DC                                | Bloqueia a autenticação                       | Resolver no início da fase 1                                                                                             |
+| Sweeper ativo da `-apisix` republicar coletas do v2 na fila antiga | A mesma coleta roda no scraper e no 2.0       | v2 isolado das tabelas do DC atual (§3.4); verificação em STG na fase 6                                                  |
 
 Lista completa dos pontos de atenção, inclusive os que não afetam prazo: §3.13.
 
@@ -716,6 +743,7 @@ Lista completa dos pontos de atenção, inclusive os que não afetam prazo: §3.
 ### Validações
 
 26/10:
+
 1. **Alicerce primeiro.** É o objetivo principal desta fase; os coletores vêm depois, como consequência e teste do alicerce.
 2. **Piloto (Fontes Pagadoras) só depois do alicerce pronto (M1).**
 3. **Ordem dos coletores** como proposta, também depois do M1.
@@ -736,29 +764,30 @@ Primeira versão, para ser refinada. As atividades seguem as fases do roadmap.
 **Tamanho relativo:** **P** pequena, **M** média, **G** grande.
 
 **Prazos do alicerce (decididos em 27/10, recalibrados no mesmo dia).** Valem para as fases 0 a 2; as fases 3 a 6 ganham prazo na vez de cada uma.
+
 - **Premissas:** uma pessoa (Lucas), em dedicação integral (8 h por dia), desenvolvendo com o Claude Code; as horas já consideram esse ganho. Início em 27/10; feriado de 02/11 descontado.
 - **Esforço:** fase 0, 12 h; fase 1, 58 h; fase 2, 28 h. Total de cerca de 98 h, ou cerca de 117 h com folga de 20%. Com uma pessoa só, as fases correm em sequência.
 - **Acompanhamento:** as tarefas do projeto "AG Capital - Agenor" no Squads (#337 a #346) agrupam estas atividades, com as mesmas horas e datas. O Squads mostra as datas sem folga.
 
-  | Tarefa no Squads | Atividades | Horas | Datas |
-  |---|---|---|---|
-  | #337 Repositório | A0.1 a A0.3 | 1 | 27/10 |
-  | #338 Documentação da arquitetura | A0.6 | 2 | 28/10 |
-  | #339 Ambiente local e verificações automáticas | A0.4, A0.5 | 8 | 28 a 29/10 |
-  | #340 DC 2.0: base | A1.1 a A1.4, A1.13, A1.17 | 20 | 29/10 a 03/11 |
-  | #341 DC 2.0: orquestração | A1.5 a A1.11 | 28 | 03 a 09/11 |
-  | #342 DC 2.0: API e monitoramento | A1.12, A1.14 a A1.16 | 10 | 09 a 10/11 |
-  | #343 Launcher | A2.1 a A2.9 | 20 | 10 a 12/11 |
-  | #344 Validação de ponta a ponta | A2.10 | 8 | 13/11 |
-  | #345 Acessos de teste (cliente) | A0.8 | — | 03 a 18/11 |
+  | Tarefa no Squads                               | Atividades                | Horas | Datas         |
+  | ---------------------------------------------- | ------------------------- | ----- | ------------- |
+  | #337 Repositório                               | A0.1 a A0.3               | 1     | 27/10         |
+  | #338 Documentação da arquitetura               | A0.6                      | 2     | 28/10         |
+  | #339 Ambiente local e verificações automáticas | A0.4, A0.5                | 8     | 28 a 29/10    |
+  | #340 DC 2.0: base                              | A1.1 a A1.4, A1.13, A1.17 | 20    | 29/10 a 03/11 |
+  | #341 DC 2.0: orquestração                      | A1.5 a A1.11              | 28    | 03 a 09/11    |
+  | #342 DC 2.0: API e monitoramento               | A1.12, A1.14 a A1.16      | 10    | 09 a 10/11    |
+  | #343 Launcher                                  | A2.1 a A2.9               | 20    | 10 a 12/11    |
+  | #344 Validação de ponta a ponta                | A2.10                     | 8     | 13/11         |
+  | #345 Acessos de teste (cliente)                | A0.8                      | —     | 03 a 18/11    |
 
 - **Datas:**
 
-  | Marco | Sem folga | Com folga de 20% |
-  |---|---|---|
-  | M0 | 29/10 | 29/10 |
-  | Fim da fase 1 | 10/11 | — |
-  | **M1 (alicerce)** | **13/11** | **18/11** |
+  | Marco             | Sem folga | Com folga de 20% |
+  | ----------------- | --------- | ---------------- |
+  | M0                | 29/10     | 29/10            |
+  | Fim da fase 1     | 10/11     | —                |
+  | **M1 (alicerce)** | **13/11** | **18/11**        |
 
 - Se a dedicação mudar, as datas são recalculadas a partir das horas.
 
@@ -774,88 +803,88 @@ A coluna "Depende de" usa os códigos das atividades. **Cliente** indica um item
 
 Revisada item a item em 27/10.
 
-| # | Atividade | Depende de | Tam. | Horas |
-|---|---|---|---|---|
-| A0.1 | Criar o `agenor-v2` e exportar Document Collector, scraper e download service da branch mais atual de cada projeto (commit mais recente depois do `git fetch`), com branch e commit no `ORIGEM.md` e varredura de segredos antes do primeiro commit (§3.13, item 18) | — | P | 0,5 |
-| A0.2 | Esqueleto do `agenor-launcher`: Python 3.12, `pydantic-settings`, health e métricas | A0.1 | P | 0,25 |
-| A0.3 | Esqueleto do `agenor-workers`: `core/` e `workers/` | A0.1 | P | 0,25 |
-| A0.4 | CI de qualidade no padrão do Agnes Collector (lint, testes, Sonar, SBOM) para os quatro repositórios, chamando o `scripts/agent/verify.sh` de cada um. Inclui fazer os testes herdados do DC passarem (condição do M0). Build e deploy ficam na A6.2 | A0.1 | M | 5 |
-| A0.5 | **Ambiente local** (§4): Postgres com o esquema do DC atual, DC atual rodando local, cluster local (kind ou k3d), armazenamento local e acesso dos pods ao DC e ao armazenamento | A0.1 | M | 3 |
-| A0.6 | Converter a §3 em ADRs (isolamento no schema `agenor_v2`, contratos, status, despachante, autenticação) e escrever o `infra.md` | — | M | 2 |
-| A0.7 | Enviar ao cliente o documento de `ag-capital/agenor/entregaveis/` e os alertas (§3.10). Não bloqueia nada | — | P | 0,5 |
-| A0.8 | Alinhar os acessos de teste (§3.10, A2 e A3: procurador, certificado, CNPJs de teste e proxies), durante as fases 1 e 2, para estarem prontos na A3.10 | A0.7 | P | 0,5 |
+| #    | Atividade                                                                                                                                                                                                                                                            | Depende de | Tam. | Horas |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ---- | ----- |
+| A0.1 | Criar o `agenor-v2` e exportar Document Collector, scraper e download service da branch mais atual de cada projeto (commit mais recente depois do `git fetch`), com branch e commit no `ORIGEM.md` e varredura de segredos antes do primeiro commit (§3.13, item 18) | —          | P    | 0,5   |
+| A0.2 | Esqueleto do `agenor-launcher`: Python 3.12, `pydantic-settings`, health e métricas                                                                                                                                                                                  | A0.1       | P    | 0,25  |
+| A0.3 | Esqueleto do `agenor-workers`: `core/` e `workers/`                                                                                                                                                                                                                  | A0.1       | P    | 0,25  |
+| A0.4 | Fazer os testes herdados do DC passarem (condição do M0) ✅ 27/10. O CI de qualidade (Sonar, SBOM) ficou fora: pipelines são infra do cliente, e o CI entra quando for combinado com ele                 | A0.1       | M    | 5     |
+| A0.5 | **Ambiente local** (§4): Postgres com o esquema do DC atual, DC atual rodando local, cluster local (kind ou k3d), armazenamento local e acesso dos pods ao DC e ao armazenamento                                                                                     | A0.1       | M    | 3     |
+| A0.6 | Converter a §3 em ADRs (isolamento no schema `agenor_v2`, contratos, status, despachante, autenticação) e escrever o `infra.md`                                                                                                                                      | —          | M    | 2     |
+| A0.7 | Enviar ao cliente o documento de `ag-capital/agenor/entregaveis/` e os alertas (§3.10). Não bloqueia nada                                                                                                                                                            | —          | P    | 0,5   |
+| A0.8 | Alinhar os acessos de teste (§3.10, A2 e A3: procurador, certificado, CNPJs de teste e proxies), durante as fases 1 e 2, para estarem prontos na A3.10                                                                                                               | A0.7       | P    | 0,5   |
 
 ### Fase 1: Document Collector v2 (58 h, até 10/11)
 
 Revisada item a item em 27/10.
 
-| # | Atividade | Depende de | Tam. | Horas |
-|---|---|---|---|---|
-| A1.1 | **Contrato:** OpenAPI da API do consumidor, do worker e do Launcher, e esquema do evento da fila | A0.1, A0.6 | M | 3 |
-| A1.2 | Validação do token do Agnaldo no DC (usuários de serviço que já temos). É risco: começa no início da fase | A0.1 | M | 3 |
-| A1.3 | Migrações no schema `agenor_v2`: coleta, tentativa, itens, histórico de eventos e `status_text` | A1.1 | M | 3 |
-| A1.4 | Chart da release própria do DC v2, com a migração como hook do Helm e a versão do Alembic dentro do schema `agenor_v2`; tirar o Alembic do entrypoint do v2 | A1.3 | M | 3 |
-| A1.5 | Endpoints de entrada, início, sinal de vida e fim da tentativa | A1.3 | M | 5 |
-| A1.6 | Endpoints idempotentes de itens; itens já coletados | A1.3 | M | 3 |
-| A1.7 | Cálculo único do status da coleta | A1.5, A1.6 | M | 3 |
-| A1.8 | **Despachante:** lock, capacidade, publicar, confirmar e varredura de 1 min | A1.3, A1.17 | G | 8 |
-| A1.9 | Política de retentativa; falha técnica separada da de negócio | A1.7 | M | 3 |
-| A1.10 | Detecção de abandono e recebimento dos avisos do Launcher | A1.5, A1.9 | M | 5 |
-| A1.11 | Histórico de eventos | A1.3 | P | 1 |
-| A1.12 | DC v2 rodando no ambiente local ao lado do DC atual, no mesmo banco | A0.5, A1.4, A1.13 | P | 1,5 |
-| A1.13 | **Limpar o DC v2** do que não é do 2.0: rotas antigas sobre o `public` (inclusive as do AGuiar), `consult_*`, `/extracoes`, `query_consult`, `/test-collected`, `/sentry-debug`, CORS aberto, orquestrador antigo, sweepers e consumo da fila antiga. No fim, adotar o `ruff` no DC v2, num commit só de formatação | A0.1 | M | 3 |
-| A1.14 | Configuração validada, logs em JSON, OTel e métricas de negócio | A0.1 | M | 3 |
-| A1.15 | Verificar no ambiente local que o DC atual sobe, reinicia e funciona com o schema `agenor_v2` presente, e não enxerga as coletas do v2 (§3.13, itens 1, 4, 6 e 8). A `-apisix` é verificada em STG (A6.4) | A1.12 | P | 1,5 |
-| A1.16 | **API do consumidor:** solicitar a coleta, consultar status, listar e baixar, com o mesmo contrato do DC atual para o Agenor, sobre o `agenor_v2` (§3.13, item 17) | A1.3, A1.7 | M | 4 |
-| A1.17 | **Interface de fila**, usada pelo DC v2 e pelo Launcher: publicar, receber, renovar e apagar, com adaptador local (visibilidade, reentrega e apagamento) e adaptador da OCI Queue. O da OCI é validado em DEV (A6.3) | A0.1 | M | 5 |
+| #     | Atividade                                                                                                                                                                                                                                                                                                           | Depende de        | Tam. | Horas |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | ---- | ----- |
+| A1.1  | **Contrato:** OpenAPI da API do consumidor, do worker e do Launcher, e esquema do evento da fila                                                                                                                                                                                                                    | A0.1, A0.6        | M    | 3     |
+| A1.2  | Validação do token do Agnaldo no DC (usuários de serviço que já temos). É risco: começa no início da fase                                                                                                                                                                                                           | A0.1              | M    | 3     |
+| A1.3  | Migrações no schema `agenor_v2`: coleta, tentativa, itens, histórico de eventos e `status_text`                                                                                                                                                                                                                     | A1.1              | M    | 3     |
+| A1.4  | Chart da release própria do DC v2, com a migração como hook do Helm e a versão do Alembic dentro do schema `agenor_v2`; tirar o Alembic do entrypoint do v2                                                                                                                                                         | A1.3              | M    | 3     |
+| A1.5  | Endpoints de entrada, início, sinal de vida e fim da tentativa                                                                                                                                                                                                                                                      | A1.3              | M    | 5     |
+| A1.6  | Endpoints idempotentes de itens; itens já coletados                                                                                                                                                                                                                                                                 | A1.3              | M    | 3     |
+| A1.7  | Cálculo único do status da coleta                                                                                                                                                                                                                                                                                   | A1.5, A1.6        | M    | 3     |
+| A1.8  | **Despachante:** lock, capacidade, publicar, confirmar e varredura de 1 min                                                                                                                                                                                                                                         | A1.3, A1.17       | G    | 8     |
+| A1.9  | Política de retentativa; falha técnica separada da de negócio                                                                                                                                                                                                                                                       | A1.7              | M    | 3     |
+| A1.10 | Detecção de abandono e recebimento dos avisos do Launcher                                                                                                                                                                                                                                                           | A1.5, A1.9        | M    | 5     |
+| A1.11 | Histórico de eventos                                                                                                                                                                                                                                                                                                | A1.3              | P    | 1     |
+| A1.12 | DC v2 rodando no ambiente local ao lado do DC atual, no mesmo banco                                                                                                                                                                                                                                                 | A0.5, A1.4, A1.13 | P    | 1,5   |
+| A1.13 | **Limpar o DC v2** do que não é do 2.0: rotas antigas sobre o `public` (inclusive as do AGuiar), `consult_*`, `/extracoes`, `query_consult`, `/test-collected`, `/sentry-debug`, CORS aberto, orquestrador antigo, sweepers e consumo da fila antiga. No fim, adotar o `ruff` no DC v2, num commit só de formatação | A0.1              | M    | 3     |
+| A1.14 | Configuração validada, logs em JSON, OTel e métricas de negócio                                                                                                                                                                                                                                                     | A0.1              | M    | 3     |
+| A1.15 | Verificar no ambiente local que o DC atual sobe, reinicia e funciona com o schema `agenor_v2` presente, e não enxerga as coletas do v2 (§3.13, itens 1, 4, 6 e 8). A `-apisix` é verificada em STG (A6.4)                                                                                                           | A1.12             | P    | 1,5   |
+| A1.16 | **API do consumidor:** solicitar a coleta, consultar status, listar e baixar, com o mesmo contrato do DC atual para o Agenor, sobre o `agenor_v2` (§3.13, item 17)                                                                                                                                                  | A1.3, A1.7        | M    | 4     |
+| A1.17 | **Interface de fila**, usada pelo DC v2 e pelo Launcher: publicar, receber, renovar e apagar, com adaptador local (visibilidade, reentrega e apagamento) e adaptador da OCI Queue. O da OCI é validado em DEV (A6.3)                                                                                                | A0.1              | M    | 5     |
 
 ### Fase 2: Launcher (28 h, M1 em 13/11, 18/11 com folga)
 
 Revisada item a item em 27/10.
 
-| # | Atividade | Depende de | Tam. | Horas |
-|---|---|---|---|---|
-| A2.1 | Consumo da fila pela interface (A1.17): espera longa, renovação e tratamento de erro | A0.2, A1.17 | M | 3 |
-| A2.2 | Catálogo de tipos: imagem, comando, recursos, prazo | A0.2 | P | 1,5 |
-| A2.3 | Criação do Job (nome determinístico, "já existe" = ok) e confirmação da mensagem | A2.1, A2.2 | M | 3 |
-| A2.4 | Observação dos Jobs e aviso ao DC | A2.3, A1.10 | M | 4 |
-| A2.5 | Reconciliação ao iniciar | A2.4 | P | 1,5 |
-| A2.6 | Teto de segurança do cluster | A2.3 | P | 1,5 |
-| A2.7 | Health check real, métricas e OTel | A2.1 | P | 1,5 |
-| A2.8 | Chart Helm do Launcher, com ServiceAccount e Role, e values por cluster. Instala o Launcher no cluster local na A2.10; nos ambientes, é implantado na fase 6 | A0.2 | M | 3 |
-| A2.9 | Worker de teste (`noop`) com modos de falha | A0.3, A1.1 | P | 1 |
-| A2.10 | **Testes dos 8 cenários no ambiente local → M1** | Fase 1, A2.1–A2.9, A0.5 | M | 8 |
+| #     | Atividade                                                                                                                                                    | Depende de              | Tam. | Horas |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- | ---- | ----- |
+| A2.1  | Consumo da fila pela interface (A1.17): espera longa, renovação e tratamento de erro                                                                         | A0.2, A1.17             | M    | 3     |
+| A2.2  | Catálogo de tipos: imagem, comando, recursos, prazo                                                                                                          | A0.2                    | P    | 1,5   |
+| A2.3  | Criação do Job (nome determinístico, "já existe" = ok) e confirmação da mensagem                                                                             | A2.1, A2.2              | M    | 3     |
+| A2.4  | Observação dos Jobs e aviso ao DC                                                                                                                            | A2.3, A1.10             | M    | 4     |
+| A2.5  | Reconciliação ao iniciar                                                                                                                                     | A2.4                    | P    | 1,5   |
+| A2.6  | Teto de segurança do cluster                                                                                                                                 | A2.3                    | P    | 1,5   |
+| A2.7  | Health check real, métricas e OTel                                                                                                                           | A2.1                    | P    | 1,5   |
+| A2.8  | Chart Helm do Launcher, com ServiceAccount e Role, e values por cluster. Instala o Launcher no cluster local na A2.10; nos ambientes, é implantado na fase 6 | A0.2                    | M    | 3     |
+| A2.9  | Worker de teste (`noop`) com modos de falha                                                                                                                  | A0.3, A1.1              | P    | 1     |
+| A2.10 | **Testes dos 8 cenários no ambiente local → M1**                                                                                                             | Fase 1, A2.1–A2.9, A0.5 | M    | 8     |
 
 ### Fase 3: base dos workers e piloto (depois do M1)
 
-| # | Atividade | Depende de | Tam. |
-|---|---|---|---|
-| A3.1 | core: entrada, descarte de obsoleta, sinal de vida, cancelamento, SIGTERM | A2.10 | M |
-| A3.2 | core: cliente do Agnaldo (token; reservar, manter, trocar perfil e devolver a sessão) | A3.1 | M |
-| A3.3 | core: chave determinística no bucket e retomada | A3.1 | M |
-| A3.4 | core: registro de itens no DC e JSON da extração no bucket | A3.1 | M |
-| A3.5 | core: catálogo de erros tipados e encerramento | A3.1 | P |
-| A3.6 | core: proxies (reaproveitar o transporte atual) | A3.1 | P |
-| A3.7 | Imagens `agenor-worker` e `agenor-worker-chrome`, construídas localmente | A0.3 | P |
-| A3.8 | Worker Fontes Pagadoras | A3.1–A3.7 | M |
-| A3.9 | Ferramenta de comparação scraper × 2.0: itens, arquivos e extrações (JSON do 2.0 contra as tabelas do scraper), usada também na fase 4 | A3.4 | M |
-| A3.10 | **Validação local do piloto contra o portal real → M2** | A3.8, A3.9, A0.8 (cliente: §3.10, A2 e A3) | P |
+| #     | Atividade                                                                                                                              | Depende de                                 | Tam. |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | ---- |
+| A3.1  | core: entrada, descarte de obsoleta, sinal de vida, cancelamento, SIGTERM                                                              | A2.10                                      | M    |
+| A3.2  | core: cliente do Agnaldo (token; reservar, manter, trocar perfil e devolver a sessão)                                                  | A3.1                                       | M    |
+| A3.3  | core: chave determinística no bucket e retomada                                                                                        | A3.1                                       | M    |
+| A3.4  | core: registro de itens no DC e JSON da extração no bucket                                                                             | A3.1                                       | M    |
+| A3.5  | core: catálogo de erros tipados e encerramento                                                                                         | A3.1                                       | P    |
+| A3.6  | core: proxies (reaproveitar o transporte atual)                                                                                        | A3.1                                       | P    |
+| A3.7  | Imagens `agenor-worker` e `agenor-worker-chrome`, construídas localmente                                                               | A0.3                                       | P    |
+| A3.8  | Worker Fontes Pagadoras                                                                                                                | A3.1–A3.7                                  | M    |
+| A3.9  | Ferramenta de comparação scraper × 2.0: itens, arquivos e extrações (JSON do 2.0 contra as tabelas do scraper), usada também na fase 4 | A3.4                                       | M    |
+| A3.10 | **Validação local do piloto contra o portal real → M2**                                                                                | A3.8, A3.9, A0.8 (cliente: §3.10, A2 e A3) | P    |
 
 ### Fase 4: coletores e ZIP (depois do M2)
 
 Cada worker inclui: portar o fluxo e os parsers, usar a chave padrão, testes dos parsers e comparação local com o scraper.
 
-| # | Atividade | Depende de | Tam. |
-|---|---|---|---|
-| A4.1 | Worker DIRF | A3.10 | P |
-| A4.2 | Worker GPS (CNPJ, CEI, filiais) | A3.10 | M |
-| A4.3 | Workers PER/DCOMP e PER/DCOMP Consultor, com o leitor de PDFs sem SQL livre | A3.10 | G |
-| A4.4 | Worker DCTF (imagem com Chrome) | A3.10 | M |
-| A4.5 | Worker Créditos DCTFWeb (Moon) | A3.10, cliente (§3.10, A4) | M |
-| A4.6 | Worker DARF (session-manager, hCaptcha, SERPRO) | A3.10, cliente (§3.10, A4) | G |
-| A4.7 | Worker DCTFWeb | A3.10 | G |
-| A4.8 | Worker ZIP (streaming do download service) e criação da tentativa ZIP no DC | A3.10 | M |
-| A4.9 | **Validação local de todos os tipos → M3** | A4.1–A4.8 | M |
+| #    | Atividade                                                                   | Depende de                 | Tam. |
+| ---- | --------------------------------------------------------------------------- | -------------------------- | ---- |
+| A4.1 | Worker DIRF                                                                 | A3.10                      | P    |
+| A4.2 | Worker GPS (CNPJ, CEI, filiais)                                             | A3.10                      | M    |
+| A4.3 | Workers PER/DCOMP e PER/DCOMP Consultor, com o leitor de PDFs sem SQL livre | A3.10                      | G    |
+| A4.4 | Worker DCTF (imagem com Chrome)                                             | A3.10                      | M    |
+| A4.5 | Worker Créditos DCTFWeb (Moon)                                              | A3.10, cliente (§3.10, A4) | M    |
+| A4.6 | Worker DARF (session-manager, hCaptcha, SERPRO)                             | A3.10, cliente (§3.10, A4) | G    |
+| A4.7 | Worker DCTFWeb                                                              | A3.10                      | G    |
+| A4.8 | Worker ZIP (streaming do download service) e criação da tentativa ZIP no DC | A3.10                      | M    |
+| A4.9 | **Validação local de todos os tipos → M3**                                  | A4.1–A4.8                  | M    |
 
 ### Fase 5: extrações e consulta (fora desta versão)
 
@@ -863,15 +892,15 @@ A5.1 a A5.3 saem do escopo desta versão (§3.5).
 
 ### Fase 6: ambientes e virada (última etapa, depois do M3)
 
-| # | Atividade | Depende de | Tam. |
-|---|---|---|---|
-| A6.1 | Infra dos ambientes pronta (§3.10, parte B) | cliente | — |
-| A6.2 | Pipeline de build e deploy: imagens no Harbor e `helm upgrade --install` para os três projetos | A0.4, A6.1 | M |
-| A6.3 | **DEV:** DC v2 em release própria ao lado do atual, Launcher e workers; repetir os 8 cenários do M1 no cluster | A6.2, A2.8, A4.9 | M |
-| A6.4 | **STG:** comparação de todos os tipos com a versão atual e verificação de que a `-apisix` não enxerga o v2 → **M4** | A6.3 | M |
-| A6.5 | Revisão de segurança do caminho novo (§3.7) | A4.9 | M |
-| A6.6 | Painéis e alertas | A1.14, A2.7 | P |
-| A6.7 | Roteiro da virada e da volta, ensaiado em STG | A6.4 | M |
-| A6.8 | Deploy em PRD ao lado da versão atual | A6.4–A6.7, cliente (infra em PRD) | P |
-| A6.9 | **Virada em PRD: consumidores apontam para o DC v2 → M5** | A6.8, cliente (rota ou URL) | P |
-| A6.10 | Janela de observação e **desligamento do scraper → M6** | A6.9 | P |
+| #     | Atividade                                                                                                           | Depende de                        | Tam. |
+| ----- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ---- |
+| A6.1  | Infra dos ambientes pronta (§3.10, parte B)                                                                         | cliente                           | —    |
+| A6.2  | Pipeline de build e deploy: imagens no Harbor e `helm upgrade --install` para os três projetos                      | A0.4, A6.1                        | M    |
+| A6.3  | **DEV:** DC v2 em release própria ao lado do atual, Launcher e workers; repetir os 8 cenários do M1 no cluster      | A6.2, A2.8, A4.9                  | M    |
+| A6.4  | **STG:** comparação de todos os tipos com a versão atual e verificação de que a `-apisix` não enxerga o v2 → **M4** | A6.3                              | M    |
+| A6.5  | Revisão de segurança do caminho novo (§3.7)                                                                         | A4.9                              | M    |
+| A6.6  | Painéis e alertas                                                                                                   | A1.14, A2.7                       | P    |
+| A6.7  | Roteiro da virada e da volta, ensaiado em STG                                                                       | A6.4                              | M    |
+| A6.8  | Deploy em PRD ao lado da versão atual                                                                               | A6.4–A6.7, cliente (infra em PRD) | P    |
+| A6.9  | **Virada em PRD: consumidores apontam para o DC v2 → M5**                                                           | A6.8, cliente (rota ou URL)       | P    |
+| A6.10 | Janela de observação e **desligamento do scraper → M6**                                                             | A6.9                              | P    |

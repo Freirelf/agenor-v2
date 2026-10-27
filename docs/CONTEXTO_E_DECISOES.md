@@ -180,3 +180,23 @@ Até 27/10, só a sessão de refinamento editava o `PLANO_AGENOR_2_0.md`. Desde 
 - **Ficam em aberto nos ADRs:** a regra exata do cálculo de status (A1.7) e a forma de validar o token do Agnaldo (A1.2). Os nomes de variáveis "a definir" no `infra.md` são fixados nas atividades indicadas.
 
 **Próximo:** #339 (A0.4 e A0.5): CI de qualidade nos quatro repositórios, com os testes herdados do DC passando, e o ambiente local.
+
+### Desenvolvimento, 27/10: #339 (A0.4 e A0.5), M0 atingido
+
+- **Testes herdados do DC (A0.4):** de 560 passando, 54 falhas e 109 erros para 715 passando e 2 pulados (`skip` herdados).
+  - O `tests/conftest.py` define as variáveis exigidas pelo `Settings`, sobrepondo o shell e o `.env`, com o Postgres na porta 1, e troca o cliente da OCI Queue por um mock. Um teste de rota abria conexão com o banco; agora substitui o `get_db`.
+  - Testes desatualizados foram alinhados ao código da staging, que é a referência. Foram removidos os testes de código que não existe mais (`DataBaseService`, o schema antigo do `consult_perdcomp`, que sai na A1.13) e o do `get_collection_service`, que é código morto e quebrado.
+  - O código da staging tem o status `FILE_NOT_FOUND`, que o plano não listava; entrou no ADR-002.
+- **CI fica fora por enquanto (decisão do Lucas, 27/10).** Pipelines, Sonar e Helm são infra do cliente: se alterarmos, a responsabilidade passa a ser nossa. Um CI no Bitbucket e um no GitHub chegaram a ser escritos e foram desfeitos antes do commit. Problemas nesses arquivos viram alerta ao cliente, não correção. O `verify.sh` de cada repositório continua sendo a verificação, rodada localmente.
+  - **Alerta novo:** o `bitbucket-pipelines.yml` herdado no repositório do DC v2 faz build e deploy da release `document-collector-service` nos namespaces do DC atual, e usa a chave do Sonar do DC atual. Se o v2 entrar no Bitbucket do cliente com esse arquivo, um push em `dev` ou `staging` sobrescreve o DC atual. Entrou nos alertas da §3.10.
+  - Ficaram o `pytest-cov` nos três esqueletos e o `verify.sh` mostrando o log inteiro do passo que falhar quando `CI` está definido.
+- **Commits:** passam a ser mostrados ao Lucas e só entram com a confirmação dele (regra no `AGENTS.md`).
+- **Ambiente local (A0.5), em `local/` na raiz:** o `up.sh` sobe e confere o ambiente, e o `check.sh` confere. Peças:
+  - Postgres 13 na porta 5428;
+  - S3 local com SeaweedFS (a MinIO deixou de publicar imagens da edição comunitária);
+  - DC atual construído do commit de partida (`fdd4c55`), sem alterações e separado do código do v2, com a fila da OCI apontada para um endpoint inalcançável;
+  - cluster kind (`kind-agenor`), com os pods alcançando o DC e o S3 pelo nome.
+  - O DC atual sobe, reinicia e roda o `alembic upgrade head` no start. É a base da A1.15.
+- **M0 atingido:** os testes atuais passam, e o ambiente local sobe o DC atual sobre o banco local. O CI de qualidade, que a A0.4 previa, fica para quando for combinado com o cliente.
+
+**Próximo:** #340 (DC 2.0, base): contrato em OpenAPI e esquema do evento (A1.1), validação do token do Agnaldo (A1.2), migrações no `agenor_v2` (A1.3), chart do DC v2 (A1.4), limpeza do DC v2 (A1.13) e interface de fila (A1.17).

@@ -56,7 +56,7 @@ O worker registra cada item (documento ou competência) com uma **chave idempote
 
 O worker **nunca grava o status da coleta**. Ele informa itens e o resultado da tentativa, e o DC calcula o status a partir disso. É o único escritor.
 
-Os valores do status da coleta continuam os de hoje, para não quebrar quem consulta: `PENDING`, `PROCESSING`, `WAITING_SESSION`, `FINISHED`, `PARTIALLY_FINISHED`, `FINISHED_EMPTY`, `FAILED`. A regra exata do cálculo (itens × resultado da tentativa → status) é fechada na A1.7 e registrada aqui.
+Os valores do status da coleta continuam os de hoje, para não quebrar quem consulta: `PENDING`, `PROCESSING`, `WAITING_SESSION`, `FINISHED`, `PARTIALLY_FINISHED`, `FINISHED_EMPTY`, `FAILED` e `FILE_NOT_FOUND` (este último está no código da staging, embora o plano não o listasse). A regra exata do cálculo (itens × resultado da tentativa → status) é fechada na A1.7 e registrada aqui.
 
 ### Histórico de eventos
 

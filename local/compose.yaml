@@ -1,0 +1,119 @@
+# Ambiente local do Agenor 2.0 (A0.5). Sobe com local/up.sh, que cria antes o cluster kind e os
+# arquivos de .generated/. Todos os serviços entram também na rede "kind", para os pods do cluster
+# alcançarem o DC e o armazenamento pelo nome do serviço.
+#
+# Credenciais aqui são só do ambiente local, descartáveis. Nada aponta para a OCI nem para o banco
+# compartilhado.
+name: agenor-local
+
+services:
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: agenor
+      POSTGRES_PASSWORD: agenor-local
+      POSTGRES_DB: document_collector
+    ports:
+      - "127.0.0.1:5428:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agenor -d document_collector"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks: [default, kind]
+
+  # Armazenamento compatível com S3 (no lugar do bucket da OCI). Sem configuração de identidades,
+  # aceita qualquer chave de acesso.
+  s3:
+    image: chrislusf/seaweedfs:4.45
+    # -ip.bind=0.0.0.0: escuta também na rede kind, não só na rede padrão do compose.
+    command: server -dir=/data -ip.bind=0.0.0.0 -s3 -s3.port=8333 -master.volumeSizeLimitMB=256
+    ports:
+      - "127.0.0.1:8333:8333"
+    volumes:
+      - s3-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8333/healthz"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+    networks: [default, kind]
+
+  s3-setup:
+    image: curlimages/curl:8.14.1
+    depends_on:
+      s3:
+        condition: service_healthy
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        for bucket in hiperautomacao-agenor-local hiperautomacao-aguiar-local; do
+          code=$$(curl -sS -o /dev/null -w '%{http_code}' -X PUT "http://s3:8333/$$bucket")
+          # 409: o bucket já existe (subidas seguintes)
+          case "$$code" in 200|409) ;; *) echo "bucket $$bucket: HTTP $$code"; exit 1 ;; esac
+        done
+    networks: [default]
+
+  # DC atual: o commit de partida do DC (staging 8d2212f), sem alterações. Roda o mesmo entrypoint
+  # de produção, inclusive o alembic upgrade head no start sobre o public (A1.15).
+  dc-atual:
+    build: .generated/dc-atual
+    image: agenor-local/dc-atual:8d2212f
+    depends_on:
+      db:
+        condition: service_healthy
+      s3-setup:
+        condition: service_completed_successfully
+    env_file:
+      - .generated/oci.env
+    environment:
+      ENVIRONMENT: local
+      PROJECT_NAME: Document Collector (atual, local)
+      VERSION: 8d2212f
+      DESCRIPTION: DC atual no ambiente local do Agenor 2.0
+      API_PORT: "9092"
+      POSTGRES_SERVER: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: document_collector
+      POSTGRES_USER: agenor
+      POSTGRES_PASSWORD: agenor-local
+      AWS_URL_ENDPOINT: http://s3:8333
+      AWS_REGION: us-east-1
+      AWS_FILES_BUCKET: hiperautomacao-agenor-local
+      AWS_FILES_BUCKET_AGUIAR: hiperautomacao-aguiar-local
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      # Endpoint inalcançável: nenhuma chamada sai para a OCI Queue.
+      OCI_SERVICE_ENDPOINT: http://127.0.0.1:1
+      OCI_REGION: sa-saopaulo-1
+      OCI_USER_ID: ocid1.user.oc1..local
+      OCI_TENANCY_ID: ocid1.tenancy.oc1..local
+      OCI_AGENOR_QUEUE_ID: ocid1.queue.oc1..local-agenor
+      OCI_AGUIAR_QUEUE_ID: ocid1.queue.oc1..local-aguiar
+      LEDGER_URL: http://127.0.0.1:1
+      ENABLE_RBAC: "false"
+      BYPASS_LEDGER_HEADER_VALUE: local
+      DATA_COLLECTOR_API_URL: http://127.0.0.1:1
+      DATA_COLLECTOR_UPLOAD_ENDPOINT: api/v1/upload
+      DATA_COLLECTOR_USER_ID: local
+      DATA_COLLECTOR_USER_NAME: Local
+      ORCHESTRATOR_ENABLED: "false"
+    ports:
+      - "127.0.0.1:9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9092/api/v1/health/ >/dev/null"]
+      interval: 3s
+      timeout: 3s
+      retries: 60
+    networks: [default, kind]
+
+volumes:
+  db-data:
+  s3-data:
+
+networks:
+  # Criada pelo kind (local/up.sh cria o cluster antes do compose).
+  kind:
+    external: true

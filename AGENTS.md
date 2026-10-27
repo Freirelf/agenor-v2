@@ -19,6 +19,7 @@ Esta pasta é uma pasta de trabalho. O Git dela versiona só a documentação; c
 | `docs/` | este | Plano, contexto e decisões, diagnóstico e documentos do cliente |
 | `docs/arquitetura/` | este | ADRs e `infra.md` |
 | `referencia/` | nenhum | Snapshots do scraper e do download service, só para consulta |
+| `local/` | este | Ambiente local (A0.5): Postgres, S3 local, DC atual e cluster kind. Ver `local/README.md` |
 
 Os cinco repositórios estão no GitHub (`origin`). O Bitbucket do cliente entra depois como segundo remoto.
 
@@ -29,14 +30,15 @@ Os cinco repositórios estão no GitHub (`origin`). O Bitbucket do cliente entra
 - Diagnóstico do sistema atual: `docs/RELATORIO_DIAGNOSTICO_AGENOR.md`.
 - Documentos enviados pelo cliente: `docs/cliente/` (só referência de intenção; ver o contexto).
 - As decisões técnicas viram ADRs em `docs/arquitetura/`. Consulte o ADR antes de mudar algo que ele cobre.
-- **Ao concluir uma tarefa do Squads** (#337 em diante, ligadas às atividades na §6 do plano): atualize o status no topo do plano (o que foi concluído e a próxima tarefa) e o registro do dia no `docs/CONTEXTO_E_DECISOES.md`, terminando em **Próximo:**. Depois, faça o commit no repositório de docs. O Squads é atualizado pelo Lucas.
+- **Ao concluir uma tarefa do Squads** (#337 em diante, ligadas às atividades na §6 do plano): atualize o status no topo do plano (o que foi concluído e a próxima tarefa) e o registro do dia no `docs/CONTEXTO_E_DECISOES.md`, terminando em **Próximo:**. Depois, mostre ao Lucas o que entraria em cada commit, por repositório, e só commite com a confirmação dele. O Squads é atualizado pelo Lucas.
 
 ## Regras comuns
 
 - **Local primeiro.** Tudo é desenvolvido e validado localmente, com fila e armazenamento locais. Os ambientes (dev, stg, prd) são a última etapa.
 - **Só o schema `agenor_v2`.** O v2 divide o banco com o DC atual e o AGuiar, mas escreve só no `agenor_v2`. Nunca cria, altera ou grava tabelas do `public`, e a `alembic_version` do v2 fica dentro do `agenor_v2`. Os status novos (`CANCELLED`, `NO_SESSION`, `INFRA_FAILED`) existem só no v2.
+- **Infra é do cliente.** Não altere `bitbucket-pipelines.yml`, `sonar-project.properties`, `helm/`, `kubernetes/` nem values. Um problema nesses arquivos vira alerta ao cliente (§3.10 do plano), não correção. O ambiente local (`local/`) é nosso.
 - **Nenhuma credencial** no código, nos values do Helm ou nos commits. Tudo vem de Secret ou variável de ambiente. Não leia nem copie arquivos `.env`.
-- **Commit no repositório do serviço alterado.** Uma mudança que atravessa repositórios vira um commit em cada um. Esta pasta só recebe commits de documentação.
+- **Commit no repositório do serviço alterado.** Uma mudança que atravessa repositórios vira um commit em cada um. Esta pasta só recebe commits de documentação e do que atravessa os repositórios (`scripts/agent/`, `local/`).
 - **`referencia/` é só leitura.** O código portado entra no `agenor-workers`, com testes.
 - **Stack:** Python 3.12, `uv`, `pydantic-settings`, `ruff` e `pytest`. O DC herdou `black`, `isort` e `flake8` do DC atual (ver o `AGENTS.md` dele).
 
