@@ -20,7 +20,7 @@ Esta pasta é uma pasta de trabalho. O Git dela versiona só a documentação; c
 | `docs/arquitetura/` | este | ADRs e `infra.md` |
 | `referencia/` | nenhum | Snapshots do scraper e do download service, só para consulta |
 
-Os repositórios ainda não têm remoto. Depois terão dois: o GitHub da Solfy e o Bitbucket do cliente.
+Os cinco repositórios estão no GitHub (`origin`). O Bitbucket do cliente entra depois como segundo remoto.
 
 ## Plano e decisões
 
