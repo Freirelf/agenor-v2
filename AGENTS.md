@@ -20,6 +20,7 @@ Esta pasta é uma pasta de trabalho. O Git dela versiona só a documentação; c
 | `docs/arquitetura/` | este | ADRs e `infra.md` |
 | `referencia/` | nenhum | Snapshots do scraper e do download service, só para consulta |
 | `local/` | este | Ambiente local (A0.5): Postgres, S3 local, DC atual e cluster kind. Ver `local/README.md` |
+| `agenor-v2.code-workspace` | este | Workspace do VS Code com os cinco repositórios, cada um com a sua `.venv` |
 
 Os cinco repositórios estão no GitHub (`origin`). O Bitbucket do cliente entra depois como segundo remoto.
 
