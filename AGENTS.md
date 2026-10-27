@@ -29,6 +29,7 @@ Os repositórios ainda não têm remoto. Depois terão dois: o GitHub da Solfy e
 - Diagnóstico do sistema atual: `docs/RELATORIO_DIAGNOSTICO_AGENOR.md`.
 - Documentos enviados pelo cliente: `docs/cliente/` (só referência de intenção; ver o contexto).
 - As decisões técnicas viram ADRs em `docs/arquitetura/`. Consulte o ADR antes de mudar algo que ele cobre.
+- **Ao concluir uma tarefa do Squads** (#337 em diante, ligadas às atividades na §6 do plano): atualize o status no topo do plano (o que foi concluído e a próxima tarefa) e o registro do dia no `docs/CONTEXTO_E_DECISOES.md`, terminando em **Próximo:**. Depois, faça o commit no repositório de docs. O Squads é atualizado pelo Lucas.
 
 ## Regras comuns
 
