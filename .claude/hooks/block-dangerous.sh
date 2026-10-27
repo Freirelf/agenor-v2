@@ -11,9 +11,10 @@ block() {
   exit 2
 }
 
-# git push --force (inclui -f, --force-with-lease e refspec com +)
-if grep -Eq '(^|[;&|[:space:]])git([[:space:]]+-C[[:space:]]+[^[:space:]]+)?[[:space:]]+push([[:space:]]|$)' <<<"$cmd"; then
-  if grep -Eq '[[:space:]](--force|--force-with-lease|-f|--mirror|--delete|-d)([=[:space:]]|$)|[[:space:]]\+[^[:space:]]+' <<<"$cmd"; then
+# git push --force (inclui -f, --force-with-lease e refspec com +), olhando só o trecho do push
+push_args=$(tr ';&|' '\n\n\n' <<<"$cmd" | grep -E '(^|[[:space:]])git([[:space:]]+-C[[:space:]]+[^[:space:]]+)?[[:space:]]+push([[:space:]]|$)')
+if [ -n "$push_args" ]; then
+  if grep -Eq '[[:space:]](--force|--force-with-lease|-f|--mirror|--delete|-d)([=[:space:]]|$)|[[:space:]]\+[^[:space:]]+' <<<"$push_args"; then
     block "git push forçado ou destrutivo. Faça o push você mesmo, se for o caso."
   fi
 fi

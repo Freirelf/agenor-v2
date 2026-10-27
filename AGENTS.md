@@ -46,3 +46,8 @@ scripts/agent/verify.sh
 ```
 
 Roda o `scripts/agent/verify.sh` de cada repositório (lint e testes) e resume o resultado de cada um. Sai com código diferente de 0 se algum falhar. O estado conhecido de cada repositório está no `AGENTS.md` dele.
+
+Para conferir o harness do Claude Code (`.claude/`), numa sessão aberta com `claude` na raiz do `agenor-v2`:
+- `/memory` lista este `AGENTS.md`; o de cada repositório carrega quando um arquivo dele é lido;
+- `/agents` mostra o `revisor-isolamento-banco`;
+- `/hooks` mostra o `PreToolUse` (`Bash`, bloqueio de comandos perigosos) e o `PostToolUse` (`Edit|MultiEdit|Write`, `ruff` nos `.py`).

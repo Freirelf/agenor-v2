@@ -28,11 +28,15 @@ Documento de trabalho, construído em etapas. Cada etapa é validada antes da se
 
 Depois do refinamento, desenvolvimento.
 
-**Desenvolvimento (iniciado em 27/10):** A0.1 a A0.3 ✅ concluídas. `agenor-v2` criado com o código exportado, `ORIGEM.md` por projeto, senha do banco do company-service removida dos values e esqueletos do Launcher e dos workers (commit `23b415e`).
+**Desenvolvimento (iniciado em 27/10):** #337 (A0.1 a A0.3) ✅ concluída em 27/10. `agenor-v2` criado com o código exportado, `ORIGEM.md` por projeto, senha do banco do company-service removida dos values, esqueletos do Launcher e dos workers e o `agenor-common` (evento da fila e interface de fila). Próxima: #338 (A0.6).
+
+**Documentos de trabalho (27/10):** este plano, o `CONTEXTO_E_DECISOES.md`, o relatório de diagnóstico e os documentos do cliente (`cliente/`) passaram a ser versionados em `agenor-v2/docs/`, no repositório de docs. Os entregáveis continuam em `ag-capital/agenor/entregaveis/`.
+
+**Estado herdado do DC (27/10):** dos testes atuais, 560 passam, 54 falham e 109 dão erro (o `Settings` exige variáveis de ambiente no import, e um teste importa um módulo removido). O `black` e o `isort` herdados não passam, e não há `ruff`. Os testes entram na A0.4, porque são condição do M0. O `ruff` (lint e formatação) entra no fim da A1.13, num commit só de formatação: a partir dele, as mudanças da origem deixam de entrar por diff e passam a ser portadas à mão.
 
 **Estrutura de repositórios (27/10):** o `agenor-v2` virou uma pasta de trabalho com quatro repositórios separados (`agenor-document-collector`, `agenor-launcher`, `agenor-workers`, `agenor-common`), um repositório de docs e a `referencia/` fora do Git (§4, fase 0). Todos locais, sem remoto. **Hospedagem (27/10):** cada repositório terá dois remotos, o GitHub da Solfy para o nosso time e o Bitbucket do cliente. A subida fica para depois de alguns ajustes do Lucas.
 
-**Harness de desenvolvimento (27/10):** `AGENTS.md` na raiz do `agenor-v2` (contexto entre repositórios) e um em cada repositório (comandos e armadilhas dele), `scripts/agent/verify.sh` por repositório e um na raiz, `.claude/` (settings, hooks) só na raiz e o subagente revisor do isolamento do banco. Componentes que só entram quando o procedimento existir:
+**Harness de desenvolvimento ✅ concluído em 27/10:** `AGENTS.md` na raiz do `agenor-v2` (contexto entre repositórios) e um em cada repositório (comandos e armadilhas dele), `scripts/agent/verify.sh` por repositório e um na raiz, `.claude/` (settings, hooks) só na raiz e o subagente revisor do isolamento do banco. O hook de bloqueio foi testado com 31 casos, e o `verify.sh` da raiz reporta o estado real (os três esqueletos passam; o DC falha pelo estado herdado acima). Como validar: `AGENTS.md` da raiz, seção "Verificação". Componentes que só entram quando o procedimento existir:
 - **skill "nova migração no `agenor_v2`":** ao concluir a primeira migração real (#340, A1.3), a partir do que funcionou e do ADR de dados;
 - **skill "portar um coletor":** ao concluir o piloto Fontes Pagadoras (A3.10, M2);
 - **`docs/agent/`:** só se surgir contexto que os ADRs não cubram.
@@ -968,7 +972,7 @@ Revisada item a item em 27/10.
 | A0.1 | Criar o `agenor-v2` e exportar Document Collector, scraper e download service da branch mais atual de cada projeto (commit mais recente depois do `git fetch`), com branch e commit no `ORIGEM.md` e varredura de segredos antes do primeiro commit (§3.13, item 18) | — | P | 0,5 |
 | A0.2 | Esqueleto do `agenor-launcher`: Python 3.12, `pydantic-settings`, health e métricas | A0.1 | P | 0,25 |
 | A0.3 | Esqueleto do `agenor-workers`: `core/` e `workers/` | A0.1 | P | 0,25 |
-| A0.4 | CI de qualidade no padrão do Agnes Collector (lint, testes, Sonar, SBOM) para os três projetos. Build e deploy ficam na A6.2 | A0.1 | M | 5 |
+| A0.4 | CI de qualidade no padrão do Agnes Collector (lint, testes, Sonar, SBOM) para os quatro repositórios, chamando o `scripts/agent/verify.sh` de cada um. Inclui fazer os testes herdados do DC passarem (condição do M0). Build e deploy ficam na A6.2 | A0.1 | M | 5 |
 | A0.5 | **Ambiente local** (§4): Postgres com o esquema do DC atual, DC atual rodando local, cluster local (kind ou k3d), armazenamento local e acesso dos pods ao DC e ao armazenamento | A0.1 | M | 3 |
 | A0.6 | Converter a §3 em ADRs (isolamento no schema `agenor_v2`, contratos, status, despachante, autenticação) e escrever o `infra.md` | — | M | 2 |
 | A0.7 | Enviar ao cliente o documento de `ag-capital/agenor/entregaveis/` e os alertas (§3.10). Não bloqueia nada | — | P | 0,5 |
@@ -992,7 +996,7 @@ Revisada item a item em 27/10.
 | A1.10 | Detecção de abandono e recebimento dos avisos do Launcher | A1.5, A1.9 | M | 5 |
 | A1.11 | Histórico de eventos | A1.3 | P | 1 |
 | A1.12 | DC v2 rodando no ambiente local ao lado do DC atual, no mesmo banco | A0.5, A1.4, A1.13 | P | 1,5 |
-| A1.13 | **Limpar o DC v2** do que não é do 2.0: rotas antigas sobre o `public` (inclusive as do AGuiar), `consult_*`, `/extracoes`, `query_consult`, `/test-collected`, `/sentry-debug`, CORS aberto, orquestrador antigo, sweepers e consumo da fila antiga | A0.1 | M | 3 |
+| A1.13 | **Limpar o DC v2** do que não é do 2.0: rotas antigas sobre o `public` (inclusive as do AGuiar), `consult_*`, `/extracoes`, `query_consult`, `/test-collected`, `/sentry-debug`, CORS aberto, orquestrador antigo, sweepers e consumo da fila antiga. No fim, adotar o `ruff` no DC v2, num commit só de formatação | A0.1 | M | 3 |
 | A1.14 | Configuração validada, logs em JSON, OTel e métricas de negócio | A0.1 | M | 3 |
 | A1.15 | Verificar no ambiente local que o DC atual sobe, reinicia e funciona com o schema `agenor_v2` presente, e não enxerga as coletas do v2 (§3.13, itens 1, 4, 6 e 8). A `-apisix` é verificada em STG (A6.4) | A1.12 | P | 1,5 |
 | A1.16 | **API do consumidor:** solicitar a coleta, consultar status, listar e baixar, com o mesmo contrato do DC atual para o Agenor, sobre o `agenor_v2` (§3.13, item 17) | A1.3, A1.7 | M | 4 |

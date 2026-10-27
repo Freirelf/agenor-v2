@@ -120,7 +120,7 @@ O plano está em [PLANO_AGENOR_2_0.md](PLANO_AGENOR_2_0.md). Primeira versão co
 - prazos;
 - atualização do documento base e dos slides.
 
-Só a sessão de refinamento edita o `PLANO_AGENOR_2_0.md`.
+Até 27/10, só a sessão de refinamento editava o `PLANO_AGENOR_2_0.md`. Desde então, o plano é versionado em `agenor-v2/docs/` e editado no ambiente do v2.
 
 ### Refinamento, 27/10
 
@@ -150,4 +150,11 @@ Só a sessão de refinamento edita o `PLANO_AGENOR_2_0.md`.
   - nenhum pedido ao cliente para começar.
 - **Documento base e slides antigos:** desatualizados. A recomendação é aposentá-los, porque o PDF os substitui (decisão pendente).
 
-**Próximo:** desenvolvimento, começando pela #337 (A0.1 a A0.3: criar o `agenor-v2` e exportar o código).
+### Desenvolvimento, 27/10
+
+- **#337 concluída** (A0.1 a A0.3): `agenor-v2` com quatro repositórios separados (DC v2, Launcher, workers e `agenor-common`), um repositório de docs e a `referencia/` fora do Git.
+- **Harness:** `AGENTS.md` como fonte única de contexto (lido nativamente pelo Claude Code; sem `CLAUDE.md`), `verify.sh` por repositório, hooks e o subagente revisor do isolamento do banco. Skills só depois da primeira migração (#340) e do piloto.
+- **Documentos de trabalho** versionados em `agenor-v2/docs/`.
+- **DC herdado:** testes corrigidos na A0.4 (condição do M0); `ruff` adotado no fim da A1.13.
+
+**Próximo:** #338 (A0.6): a §3 do plano convertida em ADRs e o `infra.md`.
