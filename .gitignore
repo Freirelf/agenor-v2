@@ -5,3 +5,7 @@
 /agenor-common/
 /referencia/
 .DS_Store
+
+# Configuração pessoal do Claude Code (não versionar)
+.claude/settings.local.json
+CLAUDE.local.md
