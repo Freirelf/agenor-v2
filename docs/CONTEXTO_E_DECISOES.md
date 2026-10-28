@@ -200,3 +200,18 @@ Até 27/10, só a sessão de refinamento editava o `PLANO_AGENOR_2_0.md`. Desde 
 - **M0 atingido:** os testes atuais passam, e o ambiente local sobe o DC atual sobre o banco local. O CI de qualidade, que a A0.4 previa, fica para quando for combinado com o cliente.
 
 **Próximo:** #340 (DC 2.0, base): contrato em OpenAPI e esquema do evento (A1.1), validação do token do Agnaldo (A1.2), migrações no `agenor_v2` (A1.3), chart do DC v2 (A1.4), limpeza do DC v2 (A1.13) e interface de fila (A1.17).
+
+### Refinamento, 28/10: sem chart nem values
+
+- **O kind continua.** É só local, como o Postgres e o S3 do `local/`, e o Launcher precisa de um cluster para criar Jobs. Não é infra do cliente.
+- **Não escrevemos chart nem values,** nem como sugestão: são o artefato de deploy, e entregá-los traria a responsabilidade do deploy para nós.
+  - O DC v2 e o Launcher sobem no kind com manifestos simples em `local/`.
+  - A migração roda como um Job local antes do DC v2.
+  - Para o cliente vai o `infra.md`; chart, values, pipeline e deploy (A6.2) são dele.
+- **Ajustes:**
+  - A1.4: imagem do DC v2 com comando de migração separado, mais os manifestos locais.
+  - A2.8: manifestos locais do Launcher.
+  - Pedidos 5 e 10: incluem chart e values, e a migração como etapa separada.
+  - ADR-001 e `infra.md`: a migração como etapa separada antes do deploy; o hook do Helm passa a ser só um exemplo, e a escolha é do cliente.
+
+**Próximo:** #340 (DC 2.0, base): contrato em OpenAPI e esquema do evento (A1.1), validação do token do Agnaldo (A1.2), migrações no `agenor_v2` (A1.3), imagem com migração separada e manifestos locais (A1.4), limpeza do DC v2 (A1.13) e interface de fila (A1.17).

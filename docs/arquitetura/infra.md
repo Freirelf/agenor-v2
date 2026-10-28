@@ -27,7 +27,7 @@ O mesmo Postgres do DC atual (`hiperautomacao_document_collector_<ambiente>`). D
 
 - O DC v2 usa **só o schema `agenor_v2`**, com a `alembic_version` dentro dele.
 - O usuário do DC v2 precisa criar o schema na primeira migração, ou o schema precisa já existir com esse usuário como dono. Permissão no `public` não é necessária.
-- As migrações rodam num **Job de hook do Helm** (`pre-install,pre-upgrade`), com a mesma imagem e as mesmas variáveis do DC v2 (pedido 10). O pod do DC v2 não roda migração ao subir.
+- As migrações rodam numa **etapa separada, antes do deploy**: um Job com a mesma imagem e as mesmas variáveis do DC v2, chamando o comando de migração (pedido 10). O pod do DC v2 não roda migração ao subir. Como o Job é disparado (por exemplo, um hook do Helm) é decisão do cliente.
 - O DC atual continua subindo e rodando `alembic upgrade head` sobre o `public`, sem mudança.
 
 | Variável (DC v2) | Situação |
@@ -114,7 +114,7 @@ Repositórios no Harbor (pedido 4):
 | `agenor-worker` | Workers HTTP (todos, exceto DCTF) e ZIP |
 | `agenor-worker-chrome` | Worker DCTF (HTML→PDF) |
 
-O DC v2 usa uma imagem própria, separada da do DC atual. O nome entra com o chart do DC v2 (A1.4).
+O DC v2 usa uma imagem própria, separada da do DC atual (A1.4).
 
 **Entrada de cada Job,** definida pelo Launcher como variáveis de ambiente (definido, `core/settings.py`):
 

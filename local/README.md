@@ -39,6 +39,7 @@ psql postgresql://agenor:agenor-local@127.0.0.1:5428/document_collector
 
 ## O que vem depois
 
-- **A1.12:** o DC v2 entra aqui, ao lado do DC atual, no mesmo banco.
+- **A1.4 e A1.12:** o DC v2 entra aqui, ao lado do DC atual e no mesmo banco: no compose para o dia a dia e no kind por manifestos simples (sem chart), com a migração como Job antes do deploy.
+- **Imagens no kind:** o `kind load docker-image` falha com imagens multiplataforma no OrbStack. Para as imagens nossas, construir só para a arquitetura local ou usar `kind load image-archive`.
 - **A1.17:** o adaptador local da fila.
-- **Fase 2:** o Launcher e os Jobs dos workers no cluster.
+- **Fase 2 (A2.8):** o Launcher no kind, por manifestos (Deployment, ServiceAccount e Role), e os Jobs dos workers.

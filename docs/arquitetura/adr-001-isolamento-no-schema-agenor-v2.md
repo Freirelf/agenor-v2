@@ -33,7 +33,8 @@ O que o código atual mostra:
 **Migrações:**
 
 - Alembic, com a tabela de versão **dentro do schema** (`agenor_v2.alembic_version`, via `version_table_schema`).
-- Aplicadas por um **Job de hook do Helm** (`pre-install,pre-upgrade`), como no Agnes Collector. No v2, o Alembic sai do entrypoint do pod.
+- Aplicadas numa **etapa separada, antes do deploy**: a imagem do DC v2 tem um comando só de migração, rodado como Job. No v2, o Alembic sai do entrypoint do pod.
+- Como essa etapa roda nos ambientes (por exemplo, um Job de hook do Helm `pre-install,pre-upgrade`, como no Agnes Collector) é decisão do cliente, dono do deploy (pedido 10). No ambiente local, ela roda como um Job no kind, a partir de manifestos em `local/`.
 - A primeira migração cria o schema. Nenhuma migração do v2 usa nome de tabela sem schema.
 
 **Banco do company-service:** o acesso continua (GPS por filial e nomes de empresa dependem dele), com usuário somente leitura e credencial em Secret (pedido 11 ao cliente).
