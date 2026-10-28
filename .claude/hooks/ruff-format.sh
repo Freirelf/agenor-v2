@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PostToolUse (Edit/Write): roda ruff format e ruff check --fix no .py editado, com o ruff e a
-# configuração do repositório dele. Pula repositórios sem [tool.ruff] no pyproject.toml (o DC
-# herdado): reformatar arquivos inteiros ali impede aplicar diffs da origem.
+# configuração do repositório dele. Pula repositórios sem [tool.ruff] no pyproject.toml (desde
+# 28/10, os cinco têm).
 # Erros que o --fix não resolve voltam ao modelo com exit 2.
 set -uo pipefail
 

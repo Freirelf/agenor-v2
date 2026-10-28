@@ -262,4 +262,13 @@ Implementada e testada localmente; os commits esperam a revisão do Lucas, que p
   - O nome e o identificador da revisão também passaram a ser do Alembic: o `file_template` do `alembic.ini` põe a data na frente (`20261028_9fd63faacdde_agenor_v2_inicial.py`), sem `rev_id` fixo nem arquivo renomeado.
   - A skill e os documentos agora dizem que o padrão é gerar e revisar.
 
-**Próximo:** o Lucas revisa as alterações e confirma os commits por repositório. Depois, o `ruff` no DC v2, num commit só de formatação, e a #341 (A1.5 a A1.11: DC 2.0, orquestração), a partir dos endpoints de entrada, início, sinal de vida e fim da tentativa (A1.5).
+- **Commits (confirmados pelo Lucas):** `agenor-common` 5ccc8fd, `agenor-document-collector` 1e6844b e raiz ba9c587.
+- **`ruff` no DC v2, num commit só de formatação:**
+  - substitui o `black`, o `isort` e o `flake8`, com `line-length = 120` e as regras padrão;
+  - além da formatação, entraram as correções automáticas (tipos no estilo novo, imports ordenados e sem uso) e algumas correções manuais equivalentes (`raise e` → `raise`, `if`s aninhados juntados, import duplicado e variáveis sem uso);
+  - o que mudaria comportamento ficou em `per-file-ignores`, com o motivo: `except` genérico em código herdado, `ValueError` em validador do Pydantic e o `Config` de classe dos schemas antigos;
+  - o `verify.sh` do DC passou a rodar `ruff check` e `ruff format --check`, e o hook de formatação do Claude Code passa a valer no DC;
+  - o `alembic.ini` passou a rodar o `ruff` em toda revisão gerada (`post_write_hooks`), para ela sair no formato do repositório sem edição;
+  - desde então, mudanças da origem se portam à mão.
+
+**Próximo:** a #341 (A1.5 a A1.11: DC 2.0, orquestração), a partir dos endpoints de entrada, início, sinal de vida e fim da tentativa (A1.5).
