@@ -33,6 +33,18 @@ Os cinco repositórios estão no GitHub (`origin`). O Bitbucket do cliente entra
 - As decisões técnicas viram ADRs em `docs/arquitetura/`. Consulte o ADR antes de mudar algo que ele cobre.
 - **Ao concluir uma tarefa do Squads** (#337 em diante, ligadas às atividades na §6 do plano): atualize o status no topo do plano (o que foi concluído e a próxima tarefa) e o registro do dia no `docs/CONTEXTO_E_DECISOES.md`, terminando em **Próximo:**. Depois, mostre ao Lucas o que entraria em cada commit, por repositório, e só commite com a confirmação dele. O Squads é atualizado pelo Lucas.
 
+## Como trabalhamos cada atividade
+
+O plano dá a direção; ele não é uma lista para executar ao pé da letra. Cada atividade (ou tarefa do Squads) é uma parte pequena, feita até o fim antes da próxima:
+
+1. **Analisar** o que o plano e os ADRs pedem para ela.
+2. **Verificar no código** o que existe de fato: o que reaproveitar, o que está quebrado, o que o plano não previu.
+3. **Planejar a execução** e combinar com o Lucas antes de mudar a direção do plano ou de um ADR.
+4. **Executar** com o padrão de um sistema atual: código claro, tipado e testado, configuração validada e erros explícitos.
+5. **Validar e testar** no ambiente local (`verify.sh` e, quando couber, `local/`).
+
+Subagentes entram quando ajudam: uma revisão independente (por exemplo, o `revisor-isolamento-banco` antes de commitar migrações) ou uma busca ampla no código. Uma tarefa nova do Squads começa numa sessão nova, a partir do status no topo do plano e do **Próximo:** do contexto.
+
 ## Regras comuns
 
 - **Local primeiro.** Tudo é desenvolvido e validado localmente, com fila e armazenamento locais. Os ambientes (dev, stg, prd) são a última etapa.
