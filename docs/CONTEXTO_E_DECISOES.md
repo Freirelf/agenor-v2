@@ -215,3 +215,51 @@ Até 27/10, só a sessão de refinamento editava o `PLANO_AGENOR_2_0.md`. Desde 
   - ADR-001 e `infra.md`: a migração como etapa separada antes do deploy; o hook do Helm passa a ser só um exemplo, e a escolha é do cliente.
 
 **Próximo:** #340 (DC 2.0, base): contrato em OpenAPI e esquema do evento (A1.1), validação do token do Agnaldo (A1.2), migrações no `agenor_v2` (A1.3), imagem com migração separada e manifestos locais (A1.4), limpeza do DC v2 (A1.13) e interface de fila (A1.17).
+
+### Desenvolvimento, 28/10: #340 (A1.1 a A1.4, A1.13, A1.17), DC 2.0 base
+
+Implementada e testada localmente; os commits esperam a revisão do Lucas, que pediu para ver as alterações antes (nada foi commitado).
+
+- **Sequência confirmada com o Lucas:** limpar o DC v2 de tudo o que usa o `public` já na A1.13, como o plano dizia. A API do consumidor volta na A1.16 sobre o `agenor_v2`. No intervalo, o DC v2 não tem essas rotas, sem custo: nada do v2 vai para ambiente antes da fase 6.
+- **A1.1, contrato:**
+  - API do worker e do Launcher sob `/api/v2`, com modelos no `agenor_common.api` e OpenAPI gerado em `contrato/openapi-v2.json` do DC (há teste de igualdade). As rotas respondem 501 até a A1.5, A1.6 e A1.10.
+  - Do consumidor, um retrato da API atual: as 7 chamadas que o front faz. As rotas legadas por tipo, a `coleta-completa` e a `reprocessar` ficam fora até aparecer consumidor delas (conferir nos logs do Agnaldo/APISIX antes da virada).
+  - O `DispatchEvent` passou a ter tipo e identificadores tipados (enum e UUID), com o esquema publicado em `contrato/` do `agenor-common`.
+- **A1.2, token:** a sondagem (`scripts/sondar_token_agnaldo.py`) mostrou que:
+  - o `/auth/token` espera formulário;
+  - o token é JWT RS256 do realm `agnes` do SSO, sem papel do serviço;
+  - o JWKS é público.
+
+  Decisão, registrada no ADR-006: validação local pelo JWKS e autorização por lista de usuários de serviço (`AUTH_WORKER_USERS`, `AUTH_LAUNCHER_USERS`). Validado com o token real do `solfy_coleta`, também no DC v2 rodando no compose.
+- **A1.13, limpeza:**
+  - saíram as rotas, os serviços, os modelos e as migrações do `public`, o AGuiar, o orquestrador, os endpoints de teste e de debug, o CORS aberto, o log da URL do banco com senha e as dependências sem uso;
+  - ficaram os schemas de pedido e de resposta, o banco do company-service, o storage e a observabilidade;
+  - os testes foram de 715 para 387 com a limpeza, porque os que saíram testavam código removido. Com os testes novos da #340, são 424, e 3 pulados.
+  - **O plano previa** um consumo da fila antiga e sweepers dentro do DC: não existiam. O orquestrador rodava como CronJob do chart, que é do cliente e virou alerta.
+  - **Achado:** o `greenlet` só vinha de carona pelo `locust`. O DC passou a declarar `sqlalchemy[asyncio]`.
+- **A1.17, fila:**
+  - interface assíncrona com três adaptadores: em memória, local e OCI. O local é uma tabela `fila_local.message` no Postgres do ambiente local, que atravessa processos e reproduz a OCI (visibilidade, recibo por entrega, reentrega e DLQ). O da OCI lê o `config` do SDK em arquivo;
+  - o DC recusa a fila local fora do ambiente local;
+  - os mesmos testes rodam na fila em memória e na local.
+- **A1.3, migrações:**
+  - tabelas `collection`, `attempt`, `item` e `event` no `agenor_v2`, com status em texto e `CHECK`, uma tentativa ativa por coleta (índice único parcial) e índices do despachante;
+  - o `env.py` cria o schema só se faltar, segura uma trava com prazo e só enxerga o `agenor_v2`. Comando: `python -m app.migrate`;
+  - testes em bancos descartáveis do Postgres local;
+  - no banco local do DC atual, o `public` ficou idêntico antes e depois, e o DC atual reiniciou com health 200;
+  - o `revisor-isolamento-banco` confirmou o isolamento. Os achados dele (permissão de `CREATE SCHEMA`, trava sem prazo, DSN de teste não local) foram corrigidos, e os do entrypoint e do Dockerfile, resolvidos na A1.4.
+- **A1.4, imagem:**
+  - `Dockerfile` sem root e com `uv` fixado; o `entrypoint.sh` só sobe a API, e a migração é `python -m app.migrate`;
+  - no `local/`, o DC v2 roda no compose (`127.0.0.1:9094`) depois do `dc-v2-migrate`, e no kind pelo `local/dc-v2-kind.sh` (Job de migração, depois o Deployment);
+  - o `check.sh` confere os dois DCs.
+- **Skill nova:** `.claude/skills/nova-migracao-agenor-v2/`.
+- **Alertas novos ao cliente (§3.10):** o pipeline herdado faz `docker build .` sem o contexto do `agenor-common`, e o CronJob do chart chama um módulo que não existe no v2.
+
+- **Ajuste na A1.3 (pedido do Lucas): revisão pelo autogenerate.**
+  - O modelo passou a declarar os CHECKs de status como constraints nomeadas da tabela, e a `0001` foi regenerada pelo autogenerate, com edição só no docstring.
+  - A comparação do DDL mostrou que a versão escrita à mão gerava nomes duplicados (`ck_collection_ck_collection_status`). A gerada sai com os nomes do modelo.
+  - Dois testes novos conferem o que o autogenerate não compara: os nomes das constraints no banco e os valores de cada CHECK, que precisam bater com os enums do modelo.
+  - O `revisor-isolamento-banco` confirmou o isolamento da revisão regenerada.
+  - O nome e o identificador da revisão também passaram a ser do Alembic: o `file_template` do `alembic.ini` põe a data na frente (`20261028_9fd63faacdde_agenor_v2_inicial.py`), sem `rev_id` fixo nem arquivo renomeado.
+  - A skill e os documentos agora dizem que o padrão é gerar e revisar.
+
+**Próximo:** o Lucas revisa as alterações e confirma os commits por repositório. Depois, o `ruff` no DC v2, num commit só de formatação, e a #341 (A1.5 a A1.11: DC 2.0, orquestração), a partir dos endpoints de entrada, início, sinal de vida e fim da tentativa (A1.5).

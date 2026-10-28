@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Confere o ambiente local: o banco com o esquema do DC atual, o DC atual respondendo, o S3 com o
-# bucket e os pods do cluster alcançando o DC e o S3. Sai com 1 se algum item falhar.
+# Confere o ambiente local: o banco com o esquema do DC atual e o agenor_v2, o DC atual e o DC v2
+# respondendo, o S3 com o bucket e os pods do cluster alcançando o DC e o S3. Sai com 1 se algum item falhar.
 set -uo pipefail
 cd "$(dirname "$0")"
 
@@ -29,6 +29,8 @@ check "banco: revisão do Alembic no public" psql_local "select version_num from
 check "banco: tabelas do DC atual" \
   psql_local "select count(*) || ' tabelas no public' from information_schema.tables where table_schema = 'public'"
 check "DC atual: health" curl -fsS http://127.0.0.1:9092/api/v1/health/
+check "banco: alembic_version do DC v2 no agenor_v2" psql_local "select version_num from agenor_v2.alembic_version"
+check "DC v2 (compose): health" curl -fsS -o /dev/null -w 'HTTP %{http_code}' http://127.0.0.1:9094/api/v1/health/
 check "S3: bucket do Agenor" curl -fsS -o /dev/null -w 'HTTP %{http_code}' http://127.0.0.1:8333/hiperautomacao-agenor-local
 check "cluster: nó pronto" kubectl --context "$CTX" wait --for=condition=Ready node --all --timeout=60s
 pod_reaches_services() {

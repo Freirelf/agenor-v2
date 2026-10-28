@@ -35,7 +35,13 @@ O que o código atual mostra:
 - Alembic, com a tabela de versão **dentro do schema** (`agenor_v2.alembic_version`, via `version_table_schema`).
 - Aplicadas numa **etapa separada, antes do deploy**: a imagem do DC v2 tem um comando só de migração, rodado como Job. No v2, o Alembic sai do entrypoint do pod.
 - Como essa etapa roda nos ambientes (por exemplo, um Job de hook do Helm `pre-install,pre-upgrade`, como no Agnes Collector) é decisão do cliente, dono do deploy (pedido 10). No ambiente local, ela roda como um Job no kind, a partir de manifestos em `local/`.
-- A primeira migração cria o schema. Nenhuma migração do v2 usa nome de tabela sem schema.
+- O schema é criado pelo `env.py`, antes da `alembic_version` (que mora nele), e só se ainda não existir: se o schema for criado antes por um DBA, o usuário do v2 não precisa de `CREATE` no banco. Nenhuma migração do v2 usa nome de tabela sem schema.
+- O `env.py` segura uma trava de sessão (`pg_try_advisory_lock` de duas chaves, até 5 min) contra dois Jobs de migração ao mesmo tempo, e o autogenerate só enxerga o `agenor_v2`.
+- Comando: `python -m app.migrate` (só as variáveis `POSTGRES_*`); `--sql` imprime o SQL sem conectar.
+- Status são texto com `CHECK` nomeado na tabela, não tipo `ENUM` do Postgres: nada é criado fora do schema, e um valor novo é uma migração simples.
+- As revisões são geradas pelo autogenerate a partir dos modelos e revisadas. Quando ele não detecta algo, primeiro se analisa por quê e se tenta fazer com que detecte. Só o que ele não tem como detectar (troca de valores de `CHECK`, renomeação, dados) é escrito à mão, no mesmo formato da revisão gerada. Um teste confere que os nomes das constraints no banco são os do modelo.
+
+**Verificado no ambiente local (A1.3, 28/10):** com o banco do DC atual, o `public` ficou idêntico antes e depois da migração do v2 (versão do Alembic, tabelas, colunas e constraints), e o DC atual reiniciou e respondeu 200. Os testes repetem isso num banco descartável (`tests/test_migrations_agenor_v2.py`).
 
 **Banco do company-service:** o acesso continua (GPS por filial e nomes de empresa dependem dele), com usuário somente leitura e credencial em Secret (pedido 11 ao cliente).
 

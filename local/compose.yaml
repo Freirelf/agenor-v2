@@ -109,6 +109,63 @@ services:
       retries: 60
     networks: [default, kind]
 
+  # DC v2 (A1.4): mesma imagem para a migração e para a API. A migração é uma etapa separada, que
+  # termina antes de a API subir; o pod da API não migra. Mesmo banco do DC atual, só no agenor_v2.
+  dc-v2-migrate:
+    build:
+      context: ../agenor-document-collector
+      additional_contexts:
+        agenor-common: ../agenor-common
+    image: agenor-local/dc-v2:dev
+    command: ["python", "-m", "app.migrate"]
+    environment: &dc-v2-db
+      POSTGRES_SERVER: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: document_collector
+      POSTGRES_USER: agenor
+      POSTGRES_PASSWORD: agenor-local
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [default]
+
+  dc-v2:
+    image: agenor-local/dc-v2:dev
+    depends_on:
+      dc-v2-migrate:
+        condition: service_completed_successfully
+      s3-setup:
+        condition: service_completed_successfully
+    environment:
+      <<: *dc-v2-db
+      ENVIRONMENT: local
+      PROJECT_NAME: Document Collector v2 (local)
+      VERSION: dev
+      DESCRIPTION: DC v2 no ambiente local do Agenor 2.0
+      AWS_URL_ENDPOINT: http://s3:8333
+      AWS_REGION: us-east-1
+      AWS_FILES_BUCKET: hiperautomacao-agenor-local
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      LEDGER_URL: http://127.0.0.1:1
+      BYPASS_LEDGER_HEADER_VALUE: local
+      # Fila local: tabela no schema fila_local deste Postgres (agenor_common.queue_postgres).
+      QUEUE_PROVIDER: local
+      QUEUE_LOCAL_DSN: postgresql://agenor:agenor-local@db:5432/document_collector
+      # Token dos usuários de serviço do Agnaldo, validado pelo JWKS do SSO (A1.2). Os usuários
+      # vêm do shell; o padrão é o usuário de serviço da Solfy.
+      AUTH_ISSUER: ${AGENOR_AUTH_ISSUER:-https://sso.agnes.com.br/realms/agnes}
+      AUTH_WORKER_USERS: ${AGENOR_AUTH_WORKER_USERS:-solfy_coleta}
+      AUTH_LAUNCHER_USERS: ${AGENOR_AUTH_LAUNCHER_USERS:-solfy_coleta}
+    ports:
+      - "127.0.0.1:9094:9092"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9092/api/v1/health/')"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    networks: [default, kind]
+
 volumes:
   db-data:
   s3-data:

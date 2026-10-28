@@ -7,6 +7,7 @@ local/up.sh          # sobe tudo e roda o check.sh no fim (idempotente)
 local/check.sh       # confere o ambiente
 local/down.sh        # para os containers; dados e cluster continuam
 local/down.sh --all  # apaga também os volumes e o cluster
+local/dc-v2-kind.sh  # DC v2 no kind: imagem, Job de migração e, depois dele, o Deployment
 ```
 
 Pré-requisitos: Docker (OrbStack), `kind` (`brew install kind`) e `kubectl` (vem com o OrbStack).
@@ -18,6 +19,8 @@ Pré-requisitos: Docker (OrbStack), `kind` (`brew install kind`) e `kubectl` (ve
 | Postgres 13 | `127.0.0.1:5428`, banco `document_collector`, usuário `agenor` / `agenor-local` | Esquema criado pelas migrações do DC atual, no start dele |
 | S3 local (SeaweedFS 4.45) | `http://127.0.0.1:8333` | Buckets `hiperautomacao-agenor-local` e `hiperautomacao-aguiar-local`; aceita qualquer chave de acesso |
 | DC atual | `http://127.0.0.1:9092` (`/docs`, `/api/v1/health/`) | O commit de partida do DC (`fdd4c55`, staging `8d2212f`), sem alterações |
+| DC v2 | `http://127.0.0.1:9094` (`/docs`, `/api/v1/health/`) | Construído do `agenor-document-collector` atual. O `dc-v2-migrate` roda `python -m app.migrate` e termina antes de a API subir |
+| Fila local | tabela `fila_local.message` no Postgres | Adaptador `local` do `agenor-common` (A1.17), criada no primeiro uso |
 | Cluster kind | contexto `kind-agenor` | Para os Jobs do Launcher |
 
 Senhas e chaves daqui são só do ambiente local, descartáveis.
@@ -37,9 +40,11 @@ psql postgresql://agenor:agenor-local@127.0.0.1:5428/document_collector
 
 `kubectl` e `helm` sempre com `--context kind-agenor` (o hook do Claude Code bloqueia sem contexto local).
 
+- **DC v2 no mesmo banco, só no `agenor_v2`.** O `check.sh` confere a `alembic_version` dele no `agenor_v2` e a do DC atual no `public`. A API valida o token dos usuários de serviço pelo JWKS do SSO real; os usuários aceitos vêm de `AGENOR_AUTH_WORKER_USERS` e `AGENOR_AUTH_LAUNCHER_USERS` no shell (padrão: `solfy_coleta`).
+- **DC v2 no kind** (`dc-v2-kind.sh`, manifestos em `k8s/dc-v2.yaml`): namespace `agenor`, Secret e ConfigMap locais, o Job `dc-v2-migrate` e, só se ele terminar bem, o Deployment e o Service `dc-v2:9092`. Os pods chegam ao Postgres pelo nome `db`.
+
 ## O que vem depois
 
-- **A1.4 e A1.12:** o DC v2 entra aqui, ao lado do DC atual e no mesmo banco: no compose para o dia a dia e no kind por manifestos simples (sem chart), com a migração como Job antes do deploy.
+- **A1.12:** o DC v2 já roda no compose e no kind (A1.4); falta exercitá-lo com as rotas da fase 1.
 - **Imagens no kind:** o `kind load docker-image` falha com imagens multiplataforma no OrbStack. Para as imagens nossas, construir só para a arquitetura local ou usar `kind load image-archive`.
-- **A1.17:** o adaptador local da fila.
 - **Fase 2 (A2.8):** o Launcher no kind, por manifestos (Deployment, ServiceAccount e Role), e os Jobs dos workers.

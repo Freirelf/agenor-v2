@@ -1,0 +1,128 @@
+# DC v2 no kind (A1.4). Só local: nos ambientes, chart, values e deploy são do cliente (infra.md).
+# Aplicado pelo local/dc-v2-kind.sh em três partes: base (Namespace, Secret, ConfigMap, Service),
+# o Job de migração e, só depois de ele terminar bem, o Deployment.
+# Valores e senhas daqui são do ambiente local, descartáveis, os mesmos do local/compose.yaml.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agenor
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dc-v2
+  namespace: agenor
+stringData:
+  POSTGRES_PASSWORD: agenor-local
+  AWS_ACCESS_KEY_ID: local
+  AWS_SECRET_ACCESS_KEY: local
+  QUEUE_LOCAL_DSN: postgresql://agenor:agenor-local@db:5432/document_collector
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dc-v2
+  namespace: agenor
+data:
+  POSTGRES_SERVER: db
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: document_collector
+  POSTGRES_USER: agenor
+  ENVIRONMENT: local
+  PROJECT_NAME: Document Collector v2 (kind)
+  VERSION: dev
+  DESCRIPTION: DC v2 no cluster kind do ambiente local
+  AWS_URL_ENDPOINT: http://s3:8333
+  AWS_REGION: us-east-1
+  AWS_FILES_BUCKET: hiperautomacao-agenor-local
+  LEDGER_URL: http://127.0.0.1:1
+  BYPASS_LEDGER_HEADER_VALUE: local
+  QUEUE_PROVIDER: local
+  AUTH_ISSUER: https://sso.agnes.com.br/realms/agnes
+  AUTH_WORKER_USERS: solfy_coleta
+  AUTH_LAUNCHER_USERS: solfy_coleta
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dc-v2
+  namespace: agenor
+spec:
+  selector:
+    app: dc-v2
+  ports:
+    - port: 9092
+      targetPort: 9092
+---
+# Migração: etapa separada, antes do Deployment (ADR-001). Mesma imagem, comando só de migração.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dc-v2-migrate
+  namespace: agenor
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: migrate
+          image: agenor-local/dc-v2:dev
+          imagePullPolicy: Never
+          args: ["python", "-m", "app.migrate"]
+          envFrom:
+            - configMapRef:
+                name: dc-v2
+            - secretRef:
+                name: dc-v2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dc-v2
+  namespace: agenor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dc-v2
+  template:
+    metadata:
+      labels:
+        app: dc-v2
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: api
+          image: agenor-local/dc-v2:dev
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 9092
+          envFrom:
+            - configMapRef:
+                name: dc-v2
+            - secretRef:
+                name: dc-v2
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health/
+              port: 9092
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health/
+              port: 9092
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi

@@ -1,6 +1,6 @@
 # ADR-006: Autenticação entre serviços por usuários de serviço do Agnaldo
 
-- **Status:** Aceito (o mecanismo de validação no DC é confirmado na A1.2)
+- **Status:** Aceito (validação no DC confirmada na A1.2, em 28/10)
 - **Data:** 2026-10-27
 - **Origem:** plano, §3.2 ("Autenticação"), §3.7, §3.12 (mudança 2) e §3.13, item 15
 
@@ -19,7 +19,21 @@
 - O DC valida o token em **toda chamada** das APIs novas, numa dependência do FastAPI, e confere se o usuário pode chamar aquela API (worker ou Launcher).
 - As chamadas dos consumidores continuam chegando pelo Agnaldo/APISIX, com o token do usuário final.
 
-**Em aberto (A1.2):** como o DC valida o token. As opções são a chave pública do realm (validação local do JWT) ou `GET /auth/users/me` com cache curto. A escolha entra aqui quando for confirmada.
+### Validação no DC (A1.2, 28/10)
+
+A sondagem com um usuário de serviço real (`scripts/sondar_token_agnaldo.py` do DC) mostrou:
+
+- `POST /api/v1/auth/token` espera **formulário** (`username`, `password`), não JSON, e devolve `access_token`, `expires_in` (5 h), `refresh_token` e `refresh_expires_in`.
+- O `access_token` é um **JWT RS256 do Keycloak** do SSO da Agnes (`iss = https://sso.agnes.com.br/realms/agnes`, `azp = plataforma`, `aud = account`), com `kid`. O JWKS do realm é público.
+- O token **não traz papel do serviço**: só os papéis padrão do realm. `GET /api/v1/auth/users/me` existe, mas exigiria uma chamada ao Agnaldo por requisição.
+
+**Decisão:** o DC valida o JWT **localmente**, pelo JWKS do realm (`app/auth.py`):
+
+- assinatura RS256 pelas chaves do JWKS, em cache, buscadas de novo quando aparece um `kid` desconhecido;
+- `iss` igual a `AUTH_ISSUER`, com `exp` e `iat` obrigatórios e 30 s de tolerância de relógio. O `aud` (`account`, genérico) não é conferido;
+- **autorização por lista** de `preferred_username` por API: `AUTH_WORKER_USERS` e `AUTH_LAUNCHER_USERS`. Um usuário fora da lista recebe 403 (`SERVICE_NOT_ALLOWED`); token ausente, inválido ou expirado, 401 (`TOKEN_MISSING`, `TOKEN_INVALID`, `TOKEN_EXPIRED`); JWKS fora do ar, 503.
+
+O `/auth/users/me` fica descartado: põe o Agnaldo no caminho de toda chamada e não traz nada que a lista não resolva. Validado contra o SSO real em 28/10 (`tests/test_auth_agnaldo_real.py`, opcional).
 
 ## Alternativas consideradas
 
@@ -30,6 +44,8 @@
 
 ## Consequências
 
-- A validação do token é risco do início da fase 1 (§3.13, item 15): sem ela, a API nova não fecha.
-- O Agnaldo passa a ser dependência do DC para autorizar o worker e o Launcher. Com validação local do JWT, a dependência fica só na chave pública.
+- A validação do token era risco do início da fase 1 (§3.13, item 15). Fechada na A1.2 (28/10).
+- O DC depende só do JWKS público do SSO, não do Agnaldo, para autorizar o worker e o Launcher.
+- Um usuário de serviço novo exige incluir o nome na lista do DC (configuração, sem código).
+- Se o realm mudar de emissor, muda o `AUTH_ISSUER` de cada ambiente.
 - Cada ambiente precisa de usuários de serviço para o Launcher e os workers (pedido 6).

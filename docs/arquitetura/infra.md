@@ -27,7 +27,8 @@ O mesmo Postgres do DC atual (`hiperautomacao_document_collector_<ambiente>`). D
 
 - O DC v2 usa **só o schema `agenor_v2`**, com a `alembic_version` dentro dele.
 - O usuário do DC v2 precisa criar o schema na primeira migração, ou o schema precisa já existir com esse usuário como dono. Permissão no `public` não é necessária.
-- As migrações rodam numa **etapa separada, antes do deploy**: um Job com a mesma imagem e as mesmas variáveis do DC v2, chamando o comando de migração (pedido 10). O pod do DC v2 não roda migração ao subir. Como o Job é disparado (por exemplo, um hook do Helm) é decisão do cliente.
+- As migrações rodam numa **etapa separada, antes do deploy**: um Job com a mesma imagem do DC v2 e o comando `python -m app.migrate`, que exige só as variáveis `POSTGRES_*` (pedido 10). O pod do DC v2 não roda migração ao subir. Como o Job é disparado (por exemplo, um hook do Helm) é decisão do cliente. No local: `local/k8s/dc-v2.yaml`.
+- Se o schema `agenor_v2` for criado antes por um DBA, com o usuário do DC v2 como dono, esse usuário não precisa de `CREATE` no banco.
 - O DC atual continua subindo e rodando `alembic upgrade head` sobre o `public`, sem mudança.
 
 | Variável (DC v2) | Situação |
@@ -52,9 +53,9 @@ Credencial: API key de usuário OCI, num Secret **montado como arquivo** no DC v
 
 | Variável (DC v2 e Launcher) | Situação |
 |---|---|
-| Provedor da fila (`local` ou `oci`) | A definir (A1.17) |
-| OCID e endpoint da fila (`https://cell-1.queue.messaging.sa-saopaulo-1.oci.oraclecloud.com`) | A definir (A1.17). O DC atual usa `OCI_AGENOR_QUEUE_ID` e `OCI_SERVICE_ENDPOINT`; o v2 aponta para a fila nova |
-| Caminho do `config` e perfil | A definir (A1.17). O DC atual já tem `OCI_CONFIG_FILE` |
+| `QUEUE_PROVIDER` (`oci` nos ambientes; `local` só no ambiente local) | Definido (A1.17) |
+| `OCI_QUEUE_ID` e `OCI_QUEUE_ENDPOINT` (`https://cell-1.queue.messaging.sa-saopaulo-1.oci.oraclecloud.com`) | Definido (A1.17). Apontam para a fila nova, não para a do DC atual (`OCI_AGENOR_QUEUE_ID`) |
+| `OCI_CONFIG_FILE` (caminho do `config` montado do Secret, que aponta para a `.pem`) e `OCI_CONFIG_PROFILE` (padrão `DEFAULT`) | Definido (A1.17) |
 
 ## Bucket
 
@@ -96,13 +97,15 @@ O Launcher cria um Kubernetes Job por tentativa. Decisão no [ADR-005](adr-005-l
 Usuários de serviço do Agnaldo, um por serviço. Decisão no [ADR-006](adr-006-autenticacao-por-usuario-de-servico-do-agnaldo.md).
 
 - O Launcher e os workers recebem a credencial do seu usuário de serviço por Secret e obtêm o token em `POST /auth/token`. O token fica em memória.
-- O DC v2 valida o token. Precisa alcançar o Agnaldo (ou ter a chave pública do realm, conforme a A1.2).
+- O token é obtido com `POST /api/v1/auth/token` **em formulário** (`username`, `password`).
+- O DC v2 valida o token localmente, pelo JWKS do realm do SSO (A1.2, ADR-006). Precisa alcançar o SSO (`AUTH_ISSUER`), não o Agnaldo.
 - Cada ambiente precisa de um usuário de serviço para o Launcher e um para os workers (pedido 6).
 
 | Variável | Quem usa | Situação |
 |---|---|---|
-| URL do Agnaldo, usuário e senha do usuário de serviço | Launcher e workers | A definir (A1.2 e fase 3) |
-| Forma de validar o token (URL do Agnaldo ou chave pública) | DC v2 | A definir (A1.2) |
+| URL do Agnaldo, usuário e senha do usuário de serviço | Launcher e workers | A definir (fase 2 e fase 3) |
+| `AUTH_ISSUER` (ex.: `https://sso.agnes.com.br/realms/agnes`) e, opcional, `AUTH_JWKS_URL` | DC v2 | Definido (A1.2) |
+| `AUTH_WORKER_USERS` e `AUTH_LAUNCHER_USERS`: nomes dos usuários de serviço, separados por vírgula | DC v2 | Definido (A1.2). Os nomes dependem do pedido 6 |
 
 ## Imagens
 
@@ -114,7 +117,7 @@ Repositórios no Harbor (pedido 4):
 | `agenor-worker` | Workers HTTP (todos, exceto DCTF) e ZIP |
 | `agenor-worker-chrome` | Worker DCTF (HTML→PDF) |
 
-O DC v2 usa uma imagem própria, separada da do DC atual (A1.4).
+O DC v2 usa uma imagem própria, separada da do DC atual (A1.4): `Dockerfile` do repositório, sem root (uid 10001), na porta 9092. A mesma imagem serve à API (padrão) e ao Job de migração (`python -m app.migrate`). Enquanto o `agenor-common` é instalado pelo caminho local, o build exige `--build-context agenor-common=../agenor-common`; com a tag Git publicada, deixa de exigir.
 
 **Entrada de cada Job,** definida pelo Launcher como variáveis de ambiente (definido, `core/settings.py`):
 
@@ -174,7 +177,7 @@ O DC v2, o Launcher e os workers usam a mesma tag do `agenor-common`: o evento d
 
 | Onde | O que verificar |
 |---|---|
-| DC v2 | Health check verde; a migração do hook terminou; o DC atual continua subindo |
+| DC v2 | Health check verde (`/api/v1/health/`); o Job de migração terminou; o DC atual continua subindo |
 | Launcher | Health check verde (consumindo a fila e falando com a API do Kubernetes) |
 | Workers | Uma coleta de teste cria uma tentativa, um Job no namespace dos workers e termina com os arquivos no bucket |
 

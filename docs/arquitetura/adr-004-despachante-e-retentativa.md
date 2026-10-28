@@ -57,7 +57,11 @@ Nos dois casos a tentativa termina em `INFRA_FAILED`, conta uma falha técnica e
 
 Uma fila por ambiente, nova para o 2.0: visibilidade de 15 min, retenção de 7 dias, no máximo 3 entregas, depois DLQ. A DLQ vira só descarte de mensagens obsoletas.
 
-O DC v2 e o Launcher falam com a fila pela interface `agenor_common.queue.Queue` (publicar, receber, renovar, apagar), com um adaptador local para desenvolvimento e testes e um da OCI Queue para os ambientes (A1.17).
+O DC v2 e o Launcher falam com a fila pela interface assíncrona `agenor_common.queue.Queue` (publicar, receber, renovar, apagar), escolhida por `QUEUE_PROVIDER` (A1.17, 28/10):
+
+- **local:** uma tabela no schema `fila_local` do Postgres do ambiente local (`queue_postgres.py`). Atravessa processos (DC no compose, Launcher no kind) e reproduz a OCI: visibilidade, recibo novo a cada entrega, reentrega e DLQ depois de 3 entregas. O DC recusa esse provedor fora do ambiente local.
+- **oci:** a OCI Queue pelo SDK (`queue_oci.py`), autenticada pelo `config` do SDK em arquivo. Testado com o cliente simulado; validado em DEV (A6.3).
+- **em memória:** só para testes.
 
 ### Sem Temporal nesta fase
 

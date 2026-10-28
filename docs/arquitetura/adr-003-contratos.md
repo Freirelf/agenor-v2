@@ -31,7 +31,7 @@ No 2.0 há quatro fronteiras: consumidor → DC, DC → fila → Launcher, Launc
 
 ### 3. API do worker no DC
 
-Nova, versionada e só para o Agenor 2.0.
+Nova, versionada e só para o Agenor 2.0, sob o prefixo `/api/v2`. Modelos em `agenor_common.api`; OpenAPI em `contrato/openapi-v2.json` do DC (A1.1, 28/10).
 
 | Chamada | Para quê |
 |---|---|
@@ -53,6 +53,10 @@ Nova, versionada e só para o Agenor 2.0.
 Solicitar a coleta, consultar o status, listar e baixar, **com o mesmo contrato de solicitação e consulta que o DC atual expõe ao Agenor**, sobre o `agenor_v2`. É o que torna a virada uma troca de rota ([ADR-009](adr-009-virada-unica-pelos-consumidores.md)). O mapeamento exato das rotas atuais é feito na A1.16.
 
 ### Regras comuns
+
+- Erros no formato `{"code", "message"}` (`ErrorResponse`). Uma escrita (`start`, `items`, `finish`) de uma tentativa que não é mais a vigente recebe 409 com `ATTEMPT_NOT_CURRENT`. `input` e `heartbeat` respondem 200 com `active=false`.
+- O worker informa só `SUCCEEDED`, `FAILED` (com erro tipado e `recoverable`), `NO_SESSION` ou `CANCELLED`. `INFRA_FAILED` e `TIMED_OUT` vêm do Launcher ou da detecção de abandono.
+- O contrato do consumidor a manter está retratado em `contrato/consumidor-dc-atual.openapi.json` do DC: as 7 chamadas que o front faz. As rotas legadas por tipo, a `coleta-completa` e a `reprocessar` ficam fora até aparecer um consumidor delas (conferido nos logs antes da virada).
 
 - Toda chamada é autenticada ([ADR-006](adr-006-autenticacao-por-usuario-de-servico-do-agnaldo.md)). Não existem o header de bypass nem a identificação só por `X-User-ID`.
 - Toda chamada do worker e do Launcher é idempotente: repetir não muda o resultado.

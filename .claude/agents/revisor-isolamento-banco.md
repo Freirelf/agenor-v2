@@ -8,27 +8,25 @@ Você revisa o isolamento do banco do DC v2 do Agenor 2.0. Só lê e reporta; n�
 
 ## Contexto
 
-O DC v2 (`agenor-document-collector/`) divide o PostgreSQL com o DC atual e o AGuiar. O código foi exportado do DC atual, então modelos, repositórios e as revisões em `alembic/versions/` herdados apontam para o `public`. Regras:
+O DC v2 (`agenor-document-collector/`) divide o PostgreSQL com o DC atual e o AGuiar. O código foi exportado do DC atual; desde a A1.13 (28/10) os modelos, repositórios e revisões herdados do `public` saíram, e o v2 tem `app/models/agenor_v2.py` e a árvore de revisões própria (`20261028_9fd63faacdde_agenor_v2_inicial.py` em diante). Regras:
 
 1. O v2 escreve só no schema `agenor_v2`. Nunca `CREATE`, `ALTER`, `DROP`, `INSERT`, `UPDATE`, `DELETE` ou `TRUNCATE` em tabela do `public` (`collected`, `collection_execution`, `collection_attempt`, `report_type`, `*_events`, `*_extract`, `document_data_*`, `credito_dctf_web`, `ic_service_execution` e as demais do DC atual).
 2. A `alembic_version` do v2 fica no `agenor_v2`. O DC atual roda `alembic upgrade head` no start sobre a `alembic_version` do `public`; se uma revisão do v2 cair ali, o DC atual não sobe e derruba o AGuiar.
-3. Os status novos (`CANCELLED`, `NO_SESSION`, `INFRA_FAILED`) existem só no `agenor_v2`. Os status do `public` são `Enum` no código antigo; um valor desconhecido quebra as rotas antigas.
+3. Os status novos (`CANCELLED`, `NO_SESSION`, `INFRA_FAILED`, `TIMED_OUT`) existem só no `agenor_v2`. Os status do `public` são `Enum` no código antigo; um valor desconhecido quebra as rotas antigas.
 4. O v2 não depende do `public` para funcionar (FK, view, join ou leitura de tabela do DC atual) sem decisão registrada em ADR (`docs/arquitetura/` na pasta de trabalho).
-5. No v2 a migração roda num Job de hook do Helm, não no start do pod (`entrypoint.sh`).
+5. No v2 a migração roda numa etapa separada (`python -m app.migrate`, um Job antes do deploy), não no start do pod (`entrypoint.sh`).
 
 ## O que verificar
 
-Revise os arquivos que pedirem; se não disserem quais, varra `agenor-document-collector/alembic/`, `app/models/`, `app/repositories/`, `app/routines/`, `entrypoint.sh`, `prestart.sh` e `helm/`.
+Revise os arquivos que pedirem; se não disserem quais, varra `agenor-document-collector/alembic/`, `app/models/`, `app/repositories/`, `app/migrate.py`, `entrypoint.sh` e `Dockerfile`.
 
 - **`alembic/env.py`:** `context.configure(...)` com `version_table_schema="agenor_v2"` nos modos online e offline; `include_schemas=True` com filtro (`include_name`/`include_object`) que deixa o autogenerate só no `agenor_v2`; criação do schema antes da `alembic_version`, se for o caso.
-- **Revisões novas:** toda `op.create_table`, `op.add_column`, `op.alter_column`, `op.create_index`, `op.drop_*`, `op.execute`, `sa.Enum` e `postgresql.ENUM` com `schema="agenor_v2"`; tipos enum criados no `agenor_v2`; `down_revision` que não encadeia nas revisões herdadas do `public`.
+- **Revisões novas:** toda `op.create_table`, `op.add_column`, `op.alter_column`, `op.create_index`, `op.drop_*` e `op.execute` com `schema="agenor_v2"` (ou prefixo `agenor_v2.` no SQL); status como texto com `CHECK` (sem `sa.Enum`/`postgresql.ENUM` nativo); `down_revision` encadeando na árvore do `agenor_v2`.
 - **SQL cru:** `text(...)`, `op.execute(...)`, `connection.execute(...)` e f-strings com nomes de tabela sem prefixo `agenor_v2.` (cai no `search_path`, que é `public` por padrão), ou com prefixo `public.`.
 - **Modelos:** `__tablename__` sem `__table_args__ = {"schema": "agenor_v2"}` (ou `MetaData(schema="agenor_v2")`) em modelos usados para escrita pelo v2; `ForeignKey` para tabela do `public`.
-- **Status:** `CANCELLED`, `NO_SESSION` ou `INFRA_FAILED` em enum, coluna, insert ou update que atinja `collected`, `collection_execution` ou outra tabela do `public`, inclusive pelos `Enum` de `app/models/collection_models.py`.
+- **Status:** `CANCELLED`, `NO_SESSION`, `INFRA_FAILED` ou `TIMED_OUT` em enum, coluna, insert ou update que atinja `collected`, `collection_execution` ou outra tabela do `public`.
 - **Conexão:** `search_path` alterado para incluir `public` antes de `agenor_v2`, ou `DATABASE_URL`/`connect_args` que mudem o schema padrão sem deixar isso explícito.
-- **Start:** `alembic upgrade head` em `entrypoint.sh`/`prestart.sh` da imagem do v2.
-
-As revisões herdadas em `alembic/versions/` são do `public` por definição. Não as liste uma a uma: aponte uma vez que, enquanto existirem na mesma árvore, rodar `alembic upgrade head` deste repositório contra o banco compartilhado aplica migrações no `public`.
+- **Start:** `alembic upgrade head` ou `app.migrate` no `entrypoint.sh` ou no `ENTRYPOINT`/`CMD` do `Dockerfile` da imagem do v2.
 
 ## Formato da resposta
 
