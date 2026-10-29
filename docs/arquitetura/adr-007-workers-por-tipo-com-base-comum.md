@@ -78,6 +78,7 @@ Como o ZIP se liga à coleta no banco (tentativa da mesma coleta, que disputa a 
 
 - Variáveis de ambiente validadas com `pydantic-settings`, todas documentadas num `.env.example`. Sem URL de produção fixa no código.
 - Erros tipados a partir do `collection_error_map`, com a marcação de recuperável valendo de fato. Acaba a classificação por trecho de mensagem.
+- `NO_SESSION` só quando o Agnaldo não tem sessão livre para o procurador. Causa permanente (certificado vencido, sem procuração, procurador sem acesso) é `FAILED` com `recoverable=false`: a retentativa de negócio insiste por uma janela de tempo ([ADR-004](adr-004-despachante-e-retentativa.md)) e só deve receber falha passageira (29/10, A3.5).
 
 ### O que sai
 

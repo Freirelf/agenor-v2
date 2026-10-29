@@ -3,7 +3,7 @@
 - **Status:** Aceito
 - **Data:** 2026-10-27
 - **Origem:** plano, §3.0, §3.2 ("Configuração da fila") e §3.4 ("Retentativa", "Despachante", "Limites iniciais", "Abandono", "Duas contagens"); padrão do ADR-002 do Agnes Collector
-- **Atualizado:** 2026-10-29 (A1.3b): as contagens saem das tentativas, sem contador na coleta; o tipo do despachante é o da coleta
+- **Atualizado:** 2026-10-29 (A1.3b): as contagens saem das tentativas, sem contador na coleta; o tipo do despachante é o da coleta. 2026-10-29 (A1.9): limite da retentativa de negócio por janela de tempo
 
 ## Contexto
 
@@ -37,14 +37,19 @@ Duas contagens separadas, por coleta:
 
 | Contagem | Resultados que contam | Política |
 |---|---|---|
-| **Falha técnica** | `INFRA_FAILED`, `TIMED_OUT`, abandono | Nova tentativa logo em seguida; na 3ª falha técnica, a coleta vai para `FAILED` |
-| **Retentativa de negócio** | `NO_SESSION`, `FAILED` recuperável | Nova tentativa depois de 5, 15, 30, 60 e 60 min, e depois a cada 60 min, até o limite do tipo; então `FAILED` com o motivo |
+| **Falha técnica** | `INFRA_FAILED`, `TIMED_OUT`, abandono | Nova tentativa logo em seguida; na 3ª falha técnica, a coleta vai para `FAILED` (ou `PARTIALLY_FINISHED`, se algum item tem arquivo: ADR-002) |
+| **Retentativa de negócio** | `NO_SESSION`, `FAILED` recuperável | Nova tentativa depois de 5, 15, 30, 60 e 60 min, e depois a cada 60 min, enquanto a primeira falha de negócio da coleta tiver menos de 8 h (janela); então `FAILED` com o motivo |
 
 - `NO_SESSION` deixa a coleta em `WAITING_SESSION` enquanto espera.
 - `FAILED` não recuperável (ex.: procuração inválida) leva a coleta a `FAILED` imediatamente.
 - `CANCELLED` não conta em nenhuma das duas.
 - As contagens não são gravadas: saem das tentativas da coleta no momento em que uma termina (por status e `recoverable`), com a linha da coleta travada (`SELECT … FOR NO KEY UPDATE`, que não bloqueia quem só insere itens ou eventos da coleta). É a mesma trava que serializa o fim da tentativa, o aviso do Launcher e o abandono da mesma coleta, então não há contador para ficar fora de sincronia. A espera da retentativa de negócio sai do número de retentativas de negócio já feitas.
 - A espera é gravada como hora de retentativa na nova tentativa; o despachante só a publica quando a hora chega.
+- **Limite da retentativa de negócio por tempo, não por contagem (29/10, A1.9).** O que importa para quem pediu é quanto tempo o sistema insiste antes de dar a resposta definitiva; uma contagem depende da tabela de esperas e não diz isso. A janela é `RETRY_BUSINESS_WINDOW_HOURS` (padrão 8 h, para a resposta sair no mesmo dia), contada da primeira falha de negócio da coleta, e sai das tentativas, como as contagens. Uma nova tentativa só é criada se a hora dela (`not_before`) cair dentro da janela. O 8 h é inicial: é calibrado em STG com as métricas da A1.14 (A6.4). Substitui o "10 retentativas" da decisão 2 da #341, que não tinha base em dados.
+- A política fica num registro por tipo (`retry_policies()` em `retry.py` do DC, Strategy). Hoje todos os tipos usam a mesma; um tipo que precise de outra janela vira uma entrada nova.
+- A falha técnica continua por contagem (3): a nova tentativa é imediata, e o limite evita insistir num Job que não sobe.
+- Coleta cancelada não ganha retentativa, qualquer que seja o resultado.
+- O limite só funciona se só falha passageira chegar a ele: causa permanente (certificado vencido, sem procuração) é `FAILED` não recuperável, nunca `NO_SESSION` ([ADR-007](adr-007-workers-por-tipo-com-base-comum.md), A3.5).
 
 ### Abandono
 

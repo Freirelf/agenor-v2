@@ -51,7 +51,7 @@ Os pontos levantados na #341, cada um com a recomendação aprovada em 29/10 e a
 **Decisão: saem.** A retentativa (A1.9) conta na hora em que uma tentativa termina:
 
 - falhas técnicas: tentativas da coleta com `INFRA_FAILED` ou `TIMED_OUT` (o abandono termina em `INFRA_FAILED`);
-- retentativas de negócio: tentativas com `NO_SESSION` ou `FAILED` com `recoverable = true`. A espera seguinte (5, 15, 30, 60 min…) sai desse número.
+- retentativas de negócio: tentativas com `NO_SESSION` ou `FAILED` com `recoverable = true`. A espera seguinte (5, 15, 30, 60 min…) sai desse número. O limite é uma janela de tempo desde a primeira falha de negócio (A1.9, ADR-004), cuja hora é o `created_at` da tentativa seguinte a ela.
 
 É uma consulta pequena (uma coleta tem poucas tentativas), pelo índice de `(collection_id, number)`, o mesmo que o cálculo do status (A1.7) usa para ler as últimas tentativas. Ela roda com a linha da coleta travada (`SELECT … FOR NO KEY UPDATE`, que não bloqueia quem só insere itens ou eventos da coleta), a mesma trava que serializa o fim da tentativa, o aviso do Launcher e o abandono da mesma coleta. Assim, não há contador para ficar fora de sincronia. ADR-004 ganha essa regra.
 
@@ -129,7 +129,7 @@ Uma linha por pedido. A entrada não muda depois de criada; o status é só do D
 | `request_user_name` | texto(512), opcional | Nome de quem pediu, junto do id | Consumidor (header) | Auditoria | `collected.request_user_name` | = |
 | `status` | texto(32) + CHECK (`CollectedStatus`, os 8 de hoje), padrão `PENDING` | Status da coleta | DC (A1.7), único escritor | Consumidor | `collected.status` | = |
 | `status_text` | texto, opcional | Status legível, com o motivo (ADR-002) | DC (A1.7) | Consumidor | `failure_reason`, que o DC atual derivava dos eventos | = |
-| `cancelled_at` | timestamptz, opcional | Marca a coleta como cancelada: o status não tem `CANCELLED`. O `input` e o `heartbeat` respondem `active = false`, e a retentativa não cria nova tentativa | DC (cancelamento; a chamada ainda não existe no contrato do consumidor, entra com a A1.16 ou o cenário de cancelamento da A2.10) | DC (A1.5, A1.9) | — | = |
+| `cancelled_at` | timestamptz, opcional | Marca a coleta como cancelada: o status não tem `CANCELLED`. O `input` e o `heartbeat` respondem `active = false`, e a retentativa não cria nova tentativa | DC (cancelamento; a chamada ainda não existe no contrato do consumidor, entra com a A1.16 ou o cenário de cancelamento da A2.10) | DC (A1.5, A1.9; A1.7 no `status_text`) | — | = |
 | `created_at` | timestamptz, padrão `now()` | Hora do pedido | DC | Consumidor | `collected.created_at` | = |
 | ~~`request_payload`~~ | | | | | | sai (decisão 2) |
 | ~~`technical_failures`~~, ~~`business_retries`~~ | | | | | | sai (decisão 1) |
@@ -155,7 +155,7 @@ Uma linha por vez que o DC manda executar a coleta (ADR-002). É também o que o
 | `error_code` | texto(64), opcional | Código tipado do erro (do worker) ou o tipo de falha (do Launcher ou do abandono) | Worker (`finish`), Launcher, varredura | A1.7 (`status_text`) | — | = |
 | `error_message` | texto, opcional | Mensagem do erro | Worker, Launcher, varredura | A1.7 (`status_text`) | `collection_attempt.error_message` | = |
 | `recoverable` | boolean, opcional | `FAILED` recuperável conta como retentativa de negócio; não recuperável leva a coleta a `FAILED` | Worker (`finish`) | Retentativa (A1.9) | marcação do `collection_error_map`, no scraper | = |
-| `created_at` | timestamptz, padrão `now()` | Ordem de despacho ("em ordem de criação", ADR-004) | DC | Despachante | `collection_attempt.created_at` | = |
+| `created_at` | timestamptz, padrão `now()` | Ordem de despacho ("em ordem de criação", ADR-004); hora da falha que gerou a retentativa (a janela da retentativa de negócio conta a partir dela) | DC | Despachante, retentativa (A1.9) | `collection_attempt.created_at` | = |
 | ~~`attempt_type`~~ | | | | | | sai (decisão 3) |
 | ~~`job_created_at`~~, ~~`job_name`~~, ~~`pod_name`~~, ~~`worker_version`~~, ~~`started_at`~~, ~~`finished_at`~~ | | | | | | sai: evento (decisão 4) |
 | ~~`updated_at`~~ | | | | | | sai (decisão 7) |
@@ -215,7 +215,7 @@ Catálogo dos eventos, fechado na A1.11 (`app/services/orchestration/events.py`,
 | `collection.created` | `USER` | Pedido aceito | — |
 | `collection.status_changed` | `SYSTEM` | A1.7 muda o status | `old`, `new` |
 | `collection.cancelled` | `USER` | Cancelamento | — |
-| `attempt.created` | `SYSTEM` | Nova tentativa (primeira ou retentativa) | `number`, `not_before`, `reason` (por que foi criada) |
+| `attempt.created` | `SYSTEM` | Nova tentativa (primeira ou retentativa) | `number`, `not_before`, `reason` (`TECHNICAL` ou `BUSINESS` na retentativa; o valor da primeira tentativa entra com a criação da coleta, A1.8) |
 | `attempt.dispatched` | `SYSTEM` | Fila confirmou a publicação | — |
 | `attempt.job_created` | `SYSTEM` | Aviso `JOB_CREATED` do Launcher | `job_name` |
 | `attempt.started` | `ROBOT` | `start` do worker | `job_name`, `pod_name`, `worker_version` |

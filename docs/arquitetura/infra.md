@@ -57,6 +57,8 @@ Credencial: API key de usuário OCI, num Secret **montado como arquivo** no DC v
 | `OCI_QUEUE_ID` e `OCI_QUEUE_ENDPOINT` (`https://cell-1.queue.messaging.sa-saopaulo-1.oci.oraclecloud.com`) | Definido (A1.17). Apontam para a fila nova, não para a do DC atual (`OCI_AGENOR_QUEUE_ID`) |
 | `OCI_CONFIG_FILE` (caminho do `config` montado do Secret, que aponta para a `.pem`) e `OCI_CONFIG_PROFILE` (padrão `DEFAULT`) | Definido (A1.17) |
 
+Retentativa (só DC v2, opcional): `RETRY_BUSINESS_WINDOW_HOURS`, por quanto tempo uma coleta insiste depois da primeira falha de negócio (`NO_SESSION` ou falha recuperável). Padrão 8; calibrado em STG ([ADR-004](adr-004-despachante-e-retentativa.md)).
+
 ## Bucket
 
 O bucket OCI do Agenor (`hiperautomacao-agenor-<ambiente>`), pela API compatível com S3, como hoje. Chave dos objetos no [ADR-007](adr-007-workers-por-tipo-com-base-comum.md).

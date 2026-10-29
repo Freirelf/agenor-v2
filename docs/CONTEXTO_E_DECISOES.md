@@ -436,7 +436,29 @@ A #341 (orquestração) começou pelo levantamento no código e parou ali, por d
   - **A1.9:** a retentativa é criada antes do recálculo, na mesma transação. Ao contrário, uma falha recuperável levaria a coleta a `FAILED`, e a nova tentativa pediria `FAILED → PROCESSING`, fora da tabela (500, com o `finish` desfeito).
   - **A1.8 (`create_collection`):** o `status` padrão `PENDING` é do servidor; a coleta recém-criada tem de levá-lo explícito antes do `refresh_collection_status`.
 - **Revisão de código independente (A1.7 e `force`): sem defeito sério.** Corrigido: o teste da corrida com o lote passou a provar a espera pela trava (`pg_stat_activity`, `wait_event_type = 'Lock'`) em vez de um `sleep`, e o teste de repetição confere o 200 de cada `finish`. Levado para o plano (**Levar:**): a retentativa antes do recálculo, com teste, na A1.9 e na A1.10; o `PENDING` explícito na A1.8; na A1.16, o cancelamento encerrar a tentativa ainda não despachada. Registrado no ADR-002: coleta cancelada com worker em `SUCCEEDED` fica pelos itens.
-- **Estado intermediário, só local:** até a A1.9, um `finish` com `NO_SESSION` ou `FAILED` recuperável leva a coleta a `FAILED`, que é final. A A1.9 é a próxima atividade.
+- **Estado intermediário, só local:** até a A1.9, um `finish` com `NO_SESSION` ou `FAILED` recuperável leva a coleta a `FAILED`, que é final. Resolvido na A1.9 (abaixo).
 - **Testes:** 647 passam no DC (saíram 4 testes do `force` dos schemas herdados; cada par de status da coleta, a regra pura em cada combinação, o recálculo no `start` e no `finish` no Postgres e um lote de itens confirmado enquanto o `finish` espera); `agenor-common` 46; workers 2.
 
 **Próximo:** A1.9 (retentativa: falha técnica separada da de negócio, limite de 10 de negócio configurável por tipo em `RETRY_POLICIES`, criação da nova tentativa antes do recálculo do status).
+
+### Desenvolvimento, 29/10: #341, A1.9 (retentativa)
+
+- **Limite da retentativa de negócio por tempo, não por contagem (decisão do Lucas, 29/10).** Substitui a decisão 2 do plano de execução ("10 por padrão, configurável por tipo"). A pergunta do Lucas foi se o código tinha essa regra e o motivo dela:
+  - o sistema atual não tem retentativa de negócio: sem sessão, a coleta fica em `WAITING_SESSION` para sempre (diagnóstico, §5.2 e §5.3);
+  - as esperas (5, 15, 30, 60, 60 min) vêm do plano, no padrão do Agnes Collector, e o 10 foi recomendação nossa, sem base em dados;
+  - o que importa para quem pediu é quanto tempo o sistema insiste antes da resposta definitiva. Uma contagem depende da tabela de esperas e não diz isso.
+- **Regra:** a coleta insiste enquanto a nova tentativa cair numa janela desde a primeira falha de negócio (`RETRY_BUSINESS_WINDOW_HOURS`, padrão 8 h, para a resposta sair no mesmo dia). A falha técnica continua por contagem (3, imediata). Coleta cancelada não retenta. Tudo no ADR-004; a variável no `infra.md`.
+- **Agora ou depois (pergunta do Lucas):** a retentativa é da arquitetura nova (ADR-004, base do despachante e do abandono, cenários do M1) e entra agora. O refinamento fica para depois, cada item no **Levar:** de quem o resolve:
+  - A1.14: métricas da retentativa (quantas `NO_SESSION` e falhas recuperáveis, por tipo; tempo até terminar ou esgotar);
+  - A3.5: o worker classifica causa permanente (certificado vencido, sem procuração) como `FAILED` não recuperável, nunca `NO_SESSION` (também no ADR-007);
+  - A6.4: calibrar a janela com as métricas; um tipo que precise de outra janela vira uma entrada no registro `retry_policies()`.
+- **A1.9 ✅** (`app/services/orchestration/retry.py`):
+  - `classify` (técnica, negócio, final), `RetryPolicy` com o registro `retry_policies()` por tipo (Strategy; hoje a mesma política para todos), `decide_retry` (pura) e `schedule_retry`.
+  - `schedule_retry` roda com a coleta travada: lê as tentativas (`list_attempts`), usa o `now()` do banco (o mesmo relógio do despachante), cria a tentativa N+1 com `not_before` e grava `attempt.created` com `reason` (`TECHNICAL` ou `BUSINESS`). O `finish` o chama antes do `refresh_collection_status`, cumprindo o **Levar:** da A1.9; a A1.10 usa o mesmo caminho.
+  - Contagens e hora da primeira falha de negócio saem das tentativas: a hora é o `created_at` da tentativa seguinte a ela (o `modelo-de-dados.md` registra esse leitor).
+  - `status_text` no fim por falha: "Coleta cancelada", "Retentativas esgotadas" (falha técnica ou de negócio sem nova tentativa) ou "Falhou".
+- **`revisor-isolamento-banco` (A1.9): ISOLADO.** Corrigido: os leitores novos no `modelo-de-dados.md` (`attempt.created_at` pela janela, `collection.cancelled_at` pelo `status_text`, os valores do `reason`); a regra "toda tentativa nova é criada com a coleta travada" na docstring das travas; `schedule_retry` exige que a tentativa encerrada seja a última da coleta e numera a nova pela última; ADR-004 com o nome do registro e o `PARTIALLY_FINISHED`.
+- **Revisão de código (A1.9): sem defeito sério.** Corrigido: `RETRY_BUSINESS_WINDOW_HOURS` com mínimo de 1 h (abaixo da primeira espera, a retentativa de negócio sumiria sem aviso); testes novos da janela contada da tentativa seguinte e de duas `NO_SESSION` pelo `finish` real; o teste da corrida passou a segurar a trava da coleta até os dois `finish` estarem esperando. Levado para a A1.10: todo fim em `INFRA_FAILED` ou `TIMED_OUT` passa por `schedule_retry`.
+- **Testes:** 682 passam no DC (classificação, esperas, janela, limite técnico, cancelada; no Postgres, `NO_SESSION` → `WAITING_SESSION` com a tentativa 2 para dali a 5 min, recuperável → `PROCESSING`, janela esgotada e 3ª falha técnica → `FAILED` com o motivo, e dois `finish` simultâneos criam uma tentativa só).
+
+**Próximo:** A1.8 (despachante: trava, vagas por tipo, publicar e confirmar, varredura de 1 min no processo da API com `pg_try_advisory_xact_lock`), começando pelo **Levar:** dela no plano.
