@@ -21,7 +21,7 @@
 
 ### Validação no DC (A1.2, 28/10)
 
-A sondagem com um usuário de serviço real (`scripts/sondar_token_agnaldo.py` do DC) mostrou:
+A sondagem com um usuário de serviço real (`scripts/probe_agnaldo_token.py` do DC) mostrou:
 
 - `POST /api/v1/auth/token` espera **formulário** (`username`, `password`), não JSON, e devolve `access_token`, `expires_in` (5 h), `refresh_token` e `refresh_expires_in`.
 - O `access_token` é um **JWT RS256 do Keycloak** do SSO da Agnes (`iss = https://sso.agnes.com.br/realms/agnes`, `azp = plataforma`, `aud = account`), com `kid`. O JWKS do realm é público.

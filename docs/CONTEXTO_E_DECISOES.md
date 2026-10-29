@@ -359,3 +359,40 @@ A #341 (orquestração) começou pelo levantamento no código e parou ali, por d
   Os três últimos entram na A1.16, quando a API do consumidor usar as filiais; o primeiro, na A1.14, com a configuração.
 
 **Próximo:** a #341 retoma pela A1.6 (itens idempotentes e itens já concluídos), no padrão de código.
+
+### Desenvolvimento, 29/10: padrões de projeto e adequação do que já existe
+
+- **Pedido do Lucas:** além do padrão de código, uma base de construção definida com padrões de projeto (GoF: criacionais, estruturais e comportamentais), padrões arquiteturais e SOLID. Não um retrato do que usamos ou não, e sim **qual padrão usar para cada problema**, na forma do projeto.
+- **Documento:** `docs/arquitetura/padroes-de-projeto.md` (proposta), com:
+  - uma tabela de decisão ("preciso de… → padrão");
+  - 11 regras arquiteturais com o ADR de cada uma;
+  - os padrões de projeto, cada um com quando usar, a forma no projeto, um trecho modelo e a referência no código: Factory Method, Singleton de módulo, Adapter, Facade, Repository, Decorator, Strategy em registro por enum, Template Method, State como tabela de transições, Command, Observer com tabela de tratadores, Chain of Responsibility e Factory de teste;
+  - o SOLID como regras obrigatórias, com o que a revisão confere, mais KISS, YAGNI e DRY.
+- **Decisão do Lucas:** antes de seguir a #341, analisar o que já foi construído e pôr no padrão. Seguir e voltar depois custa mais.
+- **Análise (29/10), nos quatro repositórios:**
+  - **Fora do padrão, no código novo (ajustar agora):**
+    1. *State:* o `start` e o `finish` mudam `attempt.status` direto; falta a tabela de transições com a função `transition` e o teste de cada transição.
+    2. *Factory Method:* o `create_queue` usa `if`; o padrão é `match` no enum.
+    3. *Singleton:* `app/clients/queue.py` guarda a fila numa variável global; o padrão é `@cache`, com `cache_clear` no fechamento.
+    4. *Factory de teste:* três funções `_collection` repetidas nos testes; vão para `tests/factories.py`.
+    5. *Nomes:* cerca de 30 testes com nome em português (os da orquestração e alguns herdados de CNPJ) e três scripts (`exportar_openapi_v2.py`, `sondar_token_agnaldo.py`, `exportar_contrato.py`); identificador é em inglês.
+    6. *Docstring do padrão:* os adaptadores de fila, o `create_queue`, o `JwksKeyProvider` e os serviços não dizem o padrão que implementam.
+  - **Ajustes no próprio padrão de código**, porque o código mostra casos que ele não previa: `utils/` para funções puras sem I/O (validação de CNPJ); `models/` com um módulo por schema (`agenor_coleta.py`); `Any` também para objeto de biblioteca sem tipos (o cliente da OCI).
+  - **Herdado, já com a atividade em que entra no padrão** (exceções registradas no `pyproject.toml`):
+    - `app/main.py` (`loguru`, imports depois de código, middleware do Ledger, `domains/billing`), na A1.14;
+    - os schemas do consumidor (a cadeia de `if collection_type == ...` em `unified.py` vira registro por enum), `app/dependencies.py` (`X-User-ID`), os clientes do bucket (sem `Protocol`, com `loguru`) e o repositório e o serviço de filiais (classe e `except Exception`), na A1.16.
+  - **Sem achado:** nenhum `os.environ` fora da configuração, nenhum `HTTPException` em serviço ou repositório, nenhum SQL em rota, os adaptadores de fila já convertem os erros da biblioteca nos nossos, e o Launcher e os workers estão no padrão.
+
+- **Overengineering? (pergunta do Lucas):** não. A tabela de transições impede, por exemplo, que um aviso atrasado reabra uma tentativa encerrada; sem ela, a regra fica espalhada em `if`s a cada atividade (A1.7, A1.9, A1.10). O Adapter atrás de `Protocol` permite testar sem a OCI; Strategy e Template Method fazem de um coletor novo só um pacote novo. O padrão proíbe o que seria excesso: hierarquia de classes por padrão, contêiner de injeção, unit of work próprio. O item de menor valor (docstring com o nome do padrão) ficou numa linha, só onde ajuda.
+- **Padrão de projeto aprovado e adequação aplicada (29/10):**
+  1. *State:* `app/services/orchestration/states.py` com `ATTEMPT_TRANSITIONS` e `transition_attempt`; o `start` e o `finish` passam por ela. O `RUNNING` direto do `QUEUED` é permitido porque o `start` do worker pode chegar antes do `JOB_CREATED`. Os erros de domínio foram para `errors.py`. 81 casos de teste, um por par de status.
+  2. *Factory Method:* `create_queue` com `match`.
+  3. *Singleton:* `app/clients/queue.py` com `@cache`; o `close_queue` limpa o cache.
+  4. *Factory de teste:* `tests/factories.py` no DC.
+  5. *Nomes:* 42 testes renomeados para o inglês; scripts `export_openapi_v2.py`, `probe_agnaldo_token.py` (com as variáveis) e `export_contract.py`.
+  6. *Docstring do padrão:* adaptadores de fila, `JwksKeyProvider`, repositório e serviço de tentativas.
+  - No padrão de código: `utils/` para funções puras, `models/` com um módulo por schema, `scripts/` com nome em inglês e `Any` também para objeto de biblioteca sem tipos.
+- **Testes:** DC 531 passam e 3 são pulados; `agenor-common` 46.
+- **`revisor-isolamento-banco`: ISOLADO.** O ADR-002 passou a registrar os atalhos da tabela (`QUEUED → RUNNING`; qualquer status vigente para um final; de um final não se sai). **Decisão aberta para o Lucas:** hoje o `finish` do worker é aceito com a tentativa ainda em `QUEUED` ou `STARTING`, sem `start` (comportamento da A1.5, e os testes usam esse caminho). A recomendação é aceitar o resultado do worker só depois do `start`, salvo o `CANCELLED`; decidir antes da A1.6.
+
+**Próximo:** a #341 retoma pela A1.6 (itens idempotentes e itens já concluídos), no padrão de código e de projeto.

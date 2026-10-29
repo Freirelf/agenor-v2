@@ -5,6 +5,9 @@
 
 ## Princípios
 
+Os padrões de projeto (GoF), os arquiteturais e o SOLID, com onde cada um está no código, ficam em [padroes-de-projeto.md](padroes-de-projeto.md).
+
+
 1. **O mais simples que resolve o que a arquitetura pede agora.** Abstração só no segundo uso real, não no primeiro imaginado. Nada de arquitetura hexagonal, DDD com agregados, repositório genérico com classe base, contêiner de injeção de dependência ou unit of work próprio.
 2. **Explícito.** Funções com nome que diz o que fazem, tipos em toda assinatura, erros com código. Sem mágica de import, sem estado global além da configuração.
 3. **Cada coisa num lugar.** Uma regra mora numa camada só; a camada é fácil de achar pelo nome da pasta.
@@ -24,10 +27,12 @@ app/
   routers/           HTTP: uma rota por arquivo de assunto (v2/attempts.py, health.py)
   services/          regra de negócio e transação, um pacote por assunto (orchestration/)
   repositories/      consultas e travas, um módulo por entidade (collection.py, establishment.py)
-  models/            tabelas SQLAlchemy (agenor_coleta.py) e o banco do company-service
+  models/            tabelas SQLAlchemy, um módulo por schema (agenor_coleta.py) e o banco do company-service
   schemas/           modelos pydantic de entrada e saída que não são contrato compartilhado
   clients/           clientes de serviços externos (storage, fila)
-tests/               espelha app/: test_<camada>_<módulo>.py
+  utils/             funções puras, sem I/O e sem camada (validação de CNPJ)
+tests/               espelha app/: test_<camada>_<módulo>.py; factories.py com os dados de teste
+scripts/             ferramentas de linha de comando (export_openapi_v2.py), também com nomes em inglês
 ```
 
 ### Launcher (`agenor-launcher`)
@@ -75,7 +80,7 @@ A dependência anda num sentido só: **rota → serviço → repositório → mo
 
 - O que atravessa serviços (API do worker e do Launcher, evento da fila) mora no `agenor-common`, com `extra="forbid"` e `frozen=True`. Mudança nele é uma tag nova (ADR-003).
 - Modelos pydantic de entrada sempre validam: nada de `dict` solto chegando no serviço.
-- `Any` só para JSON livre de verdade (`data_filters`, `metadata`).
+- `Any` só para JSON livre de verdade (`data_filters`, `metadata`) e para objeto de biblioteca sem tipos (o cliente da OCI).
 
 ## Configuração e segredos
 

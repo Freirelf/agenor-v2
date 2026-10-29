@@ -10,6 +10,7 @@ Agenor → Document Collector v2 → fila → Launcher → Job do worker (um por
 
 - [visao-geral.md](visao-geral.md): as peças, o caminho de uma coleta e qual documento manda em cada assunto.
 - [padroes-de-codigo.md](padroes-de-codigo.md): como o código de cada serviço se organiza (camadas, transação, erros, nomes, tipos, testes).
+- [padroes-de-projeto.md](padroes-de-projeto.md): padrões arquiteturais, padrões de projeto (GoF) e SOLID: quais usamos, onde e quais não.
 - [../padroes-de-desenvolvimento.md](../padroes-de-desenvolvimento.md): como trabalhamos (sequência da atividade, pronto quando, Git, revisão, documentação).
 
 ## Decisões (ADRs)

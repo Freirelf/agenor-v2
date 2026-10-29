@@ -59,6 +59,7 @@ Entregas repetidas da fila e Jobs duplicados são inofensivos: só a tentativa v
 | Virada para produção | [ADR-009](adr-009-virada-unica-pelos-consumidores.md) |
 | Tabelas e colunas do `agenor_coleta` | [modelo-de-dados.md](modelo-de-dados.md) |
 | Como o código de cada serviço se organiza | [padroes-de-codigo.md](padroes-de-codigo.md) |
+| Padrões arquiteturais, GoF e SOLID | [padroes-de-projeto.md](padroes-de-projeto.md) |
 | Como trabalhamos (atividade, commit, revisão, documentação) | [padroes-de-desenvolvimento.md](../padroes-de-desenvolvimento.md) |
 | O que o código precisa do ambiente | [infra.md](infra.md) |
 | Ambiente local | `local/README.md` |

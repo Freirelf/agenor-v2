@@ -42,6 +42,12 @@ QUEUED → STARTING → RUNNING → um final
 | `TIMED_OUT` | O Job estourou o tempo máximo do tipo |
 | `CANCELLED` | A coleta foi cancelada ou a tentativa foi substituída. Não conta como falha técnica nem como retentativa |
 
+Atalhos permitidos, além do ciclo linear (tabela em `app/services/orchestration/states.py` do DC, com teste de cada transição; atualizado em 29/10):
+
+- `QUEUED → RUNNING`: o `start` do worker pode chegar antes do aviso `JOB_CREATED` do Launcher.
+- `QUEUED` ou `STARTING` → qualquer final: o Launcher (Job que falhou), o abandono e o cancelamento encerram a tentativa em qualquer ponto. Hoje o `finish` do worker também é aceito antes do `start`.
+- De um status final não se sai: um aviso atrasado não reabre a tentativa.
+
 - `QUEUED`: criada, aguardando o despachante ou já na fila. A publicação é registrada em `dispatched_at`, não no status.
 - `STARTING`: o Launcher avisou que criou o Job.
 - `RUNNING`: o worker chamou `start`.
