@@ -3,6 +3,7 @@
 - **Status:** Aceito
 - **Data:** 2026-10-27
 - **Origem:** plano, §2 ("Worker" e "Base comum"), §3.0, §3.4 ("ZIP fora da requisição"), §3.5 e §3.6
+- **Atualizado:** 2026-10-29 (A1.3b): o ZIP continua worker, e a ligação dele com a coleta fica para a fase 4
 
 ## Contexto
 
@@ -69,7 +70,9 @@ Chave única para todos os tipos:
 
 ### ZIP como worker
 
-Quando a coleta chega a um status final, o DC cria uma tentativa do tipo `ZIP`. O Launcher a executa como qualquer worker, reaproveitando o ZIP em streaming do `agenor_download_service`. O worker ZIP não usa o Agnaldo.
+Quando a coleta chega a um status final, o DC manda gerar o ZIP. O Launcher o executa como qualquer worker (tipo `ZIP` no evento da fila e no catálogo), reaproveitando o ZIP em streaming do `agenor_download_service`. O worker ZIP não usa o Agnaldo.
+
+Como o ZIP se liga à coleta no banco (tentativa da mesma coleta, que disputa a regra de uma ativa por coleta, as contagens de retentativa e o cálculo do status, ou entidade própria) é decidido quando o ZIP for detalhado, na fase 4. Até lá, o `agenor_coleta` não tem tipo de tentativa nem a chave do ZIP ([modelo de dados](modelo-de-dados.md), decisão 3).
 
 ### Configuração e erros
 
@@ -97,7 +100,7 @@ Quando a coleta chega a um status final, o DC cria uma tentativa do tipo `ZIP`. 
 
 - **Um repositório por worker.** Multiplica pipelines e versões da base comum sem ganho: os workers mudam juntos quando o `core` muda.
 - **Uma imagem por worker.** Mais builds e mais espaço no Harbor; só vale se o tamanho justificar.
-- **Extração em tabelas do `agenor_v2` já nesta versão.** Não há consumidor conhecido das extrações (§3.13, item 19). Fica para quando houver.
+- **Extração em tabelas do `agenor_coleta` já nesta versão.** Não há consumidor conhecido das extrações (§3.13, item 19). Fica para quando houver.
 - **ZIP dentro da requisição, como hoje.** Prende a requisição e o pod do DC por minutos.
 
 ## Consequências

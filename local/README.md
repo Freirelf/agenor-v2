@@ -25,7 +25,7 @@ Pré-requisitos: Docker (OrbStack), `kind` (`brew install kind`) e `kubectl` (ve
 
 Senhas e chaves daqui são só do ambiente local, descartáveis.
 
-- **DC atual separado do DC v2.** O `up.sh` extrai o commit `fdd4c55` do `agenor-document-collector` para `local/.generated/dc-atual` e constrói a imagem `agenor-local/dc-atual:8d2212f` a partir dele. O código do DC v2 muda; o DC atual não. Ele roda o entrypoint de produção, inclusive o `alembic upgrade head` no start: é o que a A1.15 usa para provar que ele sobe e reinicia com o schema `agenor_v2` presente.
+- **DC atual separado do DC v2.** O `up.sh` extrai o commit `fdd4c55` do `agenor-document-collector` para `local/.generated/dc-atual` e constrói a imagem `agenor-local/dc-atual:8d2212f` a partir dele. O código do DC v2 muda; o DC atual não. Ele roda o entrypoint de produção, inclusive o `alembic upgrade head` no start: é o que a A1.15 usa para provar que ele sobe e reinicia com o schema `agenor_coleta` presente.
 - **Fila da OCI desligada.** O DC atual cria um cliente da OCI Queue no import e exige uma chave. O `up.sh` gera uma chave RSA descartável em `local/.generated/oci.env`, e o endpoint da fila aponta para `127.0.0.1:1`: nenhuma mensagem sai.
 - **Pods alcançam os serviços pelo nome.** Os containers entram na rede Docker `kind`, então um pod do cluster chega em `http://dc-atual:9092` e `http://s3:8333`.
 - **MinIO não é usado.** A MinIO deixou de publicar as imagens da edição comunitária (Docker Hub e Quay). O `docker-compose.yml` herdado do DC ainda a cita.
@@ -40,7 +40,7 @@ psql postgresql://agenor:agenor-local@127.0.0.1:5428/document_collector
 
 `kubectl` e `helm` sempre com `--context kind-agenor` (o hook do Claude Code bloqueia sem contexto local).
 
-- **DC v2 no mesmo banco, só no `agenor_v2`.** O `check.sh` confere a `alembic_version` dele no `agenor_v2` e a do DC atual no `public`. A API valida o token dos usuários de serviço pelo JWKS do SSO real; os usuários aceitos vêm de `AGENOR_AUTH_WORKER_USERS` e `AGENOR_AUTH_LAUNCHER_USERS` no shell (padrão: `solfy_coleta`).
+- **DC v2 no mesmo banco, só no `agenor_coleta`.** O `check.sh` confere a `alembic_version` dele no `agenor_coleta` e a do DC atual no `public`. A API valida o token dos usuários de serviço pelo JWKS do SSO real; os usuários aceitos vêm de `AGENOR_AUTH_WORKER_USERS` e `AGENOR_AUTH_LAUNCHER_USERS` no shell (padrão: `solfy_coleta`).
 - **DC v2 no kind** (`dc-v2-kind.sh`, manifestos em `k8s/dc-v2.yaml`): namespace `agenor`, Secret e ConfigMap locais, o Job `dc-v2-migrate` e, só se ele terminar bem, o Deployment e o Service `dc-v2:9092`. Os pods chegam ao Postgres pelo nome `db`.
 
 ## O que vem depois

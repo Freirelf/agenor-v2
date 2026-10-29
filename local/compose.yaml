@@ -110,7 +110,7 @@ services:
     networks: [default, kind]
 
   # DC v2 (A1.4): mesma imagem para a migração e para a API. A migração é uma etapa separada, que
-  # termina antes de a API subir; o pod da API não migra. Mesmo banco do DC atual, só no agenor_v2.
+  # termina antes de a API subir; o pod da API não migra. Mesmo banco do DC atual, só no agenor_coleta.
   dc-v2-migrate:
     build:
       context: ../agenor-document-collector

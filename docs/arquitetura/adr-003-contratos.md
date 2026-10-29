@@ -50,7 +50,7 @@ Nova, versionada e só para o Agenor 2.0, sob o prefixo `/api/v2`. Modelos em `a
 
 ### 5. API do consumidor no DC
 
-Solicitar a coleta, consultar o status, listar e baixar, **com o mesmo contrato de solicitação e consulta que o DC atual expõe ao Agenor**, sobre o `agenor_v2`. É o que torna a virada uma troca de rota ([ADR-009](adr-009-virada-unica-pelos-consumidores.md)). O mapeamento exato das rotas atuais é feito na A1.16.
+Solicitar a coleta, consultar o status, listar e baixar, **com o mesmo contrato de solicitação e consulta que o DC atual expõe ao Agenor**, sobre o `agenor_coleta`. É o que torna a virada uma troca de rota ([ADR-009](adr-009-virada-unica-pelos-consumidores.md)). O mapeamento exato das rotas atuais é feito na A1.16.
 
 ### Regras comuns
 

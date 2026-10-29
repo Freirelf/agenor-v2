@@ -3,6 +3,7 @@
 - **Status:** Aceito
 - **Data:** 2026-10-27
 - **Origem:** plano, §3.0, §3.1 e §3.4 ("Único dono do status" e "Histórico de eventos")
+- **Atualizado:** 2026-10-29 (A1.3b): o que fica na tentativa e o que vai para o histórico, pelo [modelo de dados](modelo-de-dados.md)
 
 ## Contexto
 
@@ -19,11 +20,12 @@ No 2.0, uma coleta pode rodar mais de uma vez (retentativa, falha de pod, reentr
 
 ### Tentativa
 
-Cada vez que o DC manda executar uma coleta, ele cria uma **tentativa** (tabela própria no `agenor_v2`, [ADR-001](adr-001-isolamento-no-schema-agenor-v2.md)).
+Cada vez que o DC manda executar uma coleta, ele cria uma **tentativa** (tabela própria no `agenor_coleta`, [ADR-001](adr-001-isolamento-no-schema-agenor-coleta.md)).
 
 - Uma coleta tem uma ou mais tentativas, **no máximo uma ativa por vez**.
 - O `attempt_id` acompanha a mensagem, o Job, os logs e cada chamada do worker. É ele que liga solicitação → mensagem → Job → execução.
 - O worker só age se a tentativa ainda for a vigente. Qualquer chamada de uma tentativa que não vale mais é recusada.
+- A tentativa guarda só o estado que o despachante, o abandono e a retentativa consultam: status, hora de retentativa, publicação, último sinal de vida e o erro. Job, pod, versão do worker e os horários de criação do Job, início e fim vão para o histórico de eventos. O tipo é o da coleta. O detalhe de cada coluna está no [modelo de dados](modelo-de-dados.md).
 
 Status da tentativa:
 
@@ -60,19 +62,21 @@ Os valores do status da coleta continuam os de hoje, para não quebrar quem cons
 
 ### Histórico de eventos
 
-No formato do Agnes Collector, numa tabela do `agenor_v2`:
+No formato do Agnes Collector, numa tabela do `agenor_coleta`:
 
 - categoria;
-- nome com ponto (`collection.dispatched`, `attempt.no_session`, `item.downloaded`);
+- nome com ponto (`collection.status_changed`, `attempt.started`, `attempt.finished`);
 - mensagem;
 - autor (`ROBOT`, `USER` ou `SYSTEM`);
 - metadados.
+
+Não há evento por item: a linha do item é o estado dele, e o volume (centenas de itens por coleta) não compensa. O catálogo dos nomes fecha na A1.11.
 
 A coleta ganha também um `status_text` legível. As tabelas de eventos do `public` continuam para o AGuiar.
 
 ## Alternativas consideradas
 
-- **Reaproveitar a `collection_attempt`.** Já é gravada pelo orquestrador antigo ([ADR-001](adr-001-isolamento-no-schema-agenor-v2.md)).
+- **Reaproveitar a `collection_attempt`.** Já é gravada pelo orquestrador antigo ([ADR-001](adr-001-isolamento-no-schema-agenor-coleta.md)).
 - **O worker grava o status da coleta, como hoje.** Mantém os vários escritores e as corridas entre execuções.
 - **Lock no Redis contra execução duplicada.** Desnecessário com uma tentativa ativa por coleta e a recusa das chamadas de tentativas obsoletas. Os workers deixam de depender de Redis.
 

@@ -10,7 +10,7 @@ Os ambientes (DEV, STG, PRD) são a última etapa (fase 6). Até lá, tudo roda 
 
 | # | O que precisamos | Para quê | Local | Ambientes |
 |---|---|---|---|---|
-| 1 | [Banco](#banco): o Postgres do DC atual, com o schema `agenor_v2` | Estado do 2.0 | Postgres local com o esquema do DC atual | Mesmo banco do DC atual |
+| 1 | [Banco](#banco): o Postgres do DC atual, com o schema `agenor_coleta` | Estado do 2.0 | Postgres local com o esquema do DC atual | Mesmo banco do DC atual |
 | 2 | [Fila](#fila) nova para o 2.0 | Pedido de execução DC → Launcher | Adaptador local | OCI Queue nova por ambiente (pedido 3) |
 | 3 | [Bucket](#bucket) | Arquivos, planilhas e JSON das extrações | Armazenamento local compatível com S3 | Bucket OCI do Agenor, como hoje |
 | 4 | [Cluster e permissões](#cluster-e-permissões) | Launcher criar os Jobs | kind ou k3d | Namespace, ServiceAccount e Role (pedidos 1 e 2) |
@@ -23,12 +23,12 @@ Os ambientes (DEV, STG, PRD) são a última etapa (fase 6). Até lá, tudo roda 
 
 ## Banco
 
-O mesmo Postgres do DC atual (`hiperautomacao_document_collector_<ambiente>`). Decisão no [ADR-001](adr-001-isolamento-no-schema-agenor-v2.md).
+O mesmo Postgres do DC atual (`hiperautomacao_document_collector_<ambiente>`). Decisão no [ADR-001](adr-001-isolamento-no-schema-agenor-coleta.md).
 
-- O DC v2 usa **só o schema `agenor_v2`**, com a `alembic_version` dentro dele.
+- O DC v2 usa **só o schema `agenor_coleta`**, com a `alembic_version` dentro dele.
 - O usuário do DC v2 precisa criar o schema na primeira migração, ou o schema precisa já existir com esse usuário como dono. Permissão no `public` não é necessária.
 - As migrações rodam numa **etapa separada, antes do deploy**: um Job com a mesma imagem do DC v2 e o comando `python -m app.migrate`, que exige só as variáveis `POSTGRES_*` (pedido 10). O pod do DC v2 não roda migração ao subir. Como o Job é disparado (por exemplo, um hook do Helm) é decisão do cliente. No local: `local/k8s/dc-v2.yaml`.
-- Se o schema `agenor_v2` for criado antes por um DBA, com o usuário do DC v2 como dono, esse usuário não precisa de `CREATE` no banco.
+- Se o schema `agenor_coleta` for criado antes por um DBA, com o usuário do DC v2 como dono, esse usuário não precisa de `CREATE` no banco.
 - O DC atual continua subindo e rodando `alembic upgrade head` sobre o `public`, sem mudança.
 
 | Variável (DC v2) | Situação |

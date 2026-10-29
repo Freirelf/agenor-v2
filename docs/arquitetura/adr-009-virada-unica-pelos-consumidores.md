@@ -7,7 +7,7 @@
 ## Contexto
 
 - O DC atual precisa continuar no ar para o AGuiar, independente do 2.0.
-- O 2.0 roda em releases próprias e num schema próprio ([ADR-001](adr-001-isolamento-no-schema-agenor-v2.md)).
+- O 2.0 roda em releases próprias e num schema próprio ([ADR-001](adr-001-isolamento-no-schema-agenor-coleta.md)).
 - O Agnes Collector virou o mecanismo novo atrás de chaves de ambiente (`QUEUE_PROVIDER_*`), no mesmo código.
 - A convivência tipo a tipo (alguns tipos no scraper, outros no 2.0) foi descartada na Visão.
 - Os consumidores do Agenor chegam ao DC pelo Agnaldo/APISIX, com os paths do DC, e essa rota não é nossa.

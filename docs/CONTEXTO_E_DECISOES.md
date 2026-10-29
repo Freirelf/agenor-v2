@@ -251,7 +251,7 @@ Implementada e testada localmente; os commits esperam a revisão do Lucas, que p
   - `Dockerfile` sem root e com `uv` fixado; o `entrypoint.sh` só sobe a API, e a migração é `python -m app.migrate`;
   - no `local/`, o DC v2 roda no compose (`127.0.0.1:9094`) depois do `dc-v2-migrate`, e no kind pelo `local/dc-v2-kind.sh` (Job de migração, depois o Deployment);
   - o `check.sh` confere os dois DCs.
-- **Skill nova:** `.claude/skills/nova-migracao-agenor-v2/`.
+- **Skill nova:** `.claude/skills/nova-migracao-agenor-coleta/`.
 - **Alertas novos ao cliente (§3.10):** o pipeline herdado faz `docker build .` sem o contexto do `agenor-common`, e o CronJob do chart chama um módulo que não existe no v2.
 
 - **Ajuste na A1.3 (pedido do Lucas): revisão pelo autogenerate.**
@@ -272,3 +272,34 @@ Implementada e testada localmente; os commits esperam a revisão do Lucas, que p
   - desde então, mudanças da origem se portam à mão.
 
 **Próximo:** a #341 (A1.5 a A1.11: DC 2.0, orquestração), a partir dos endpoints de entrada, início, sinal de vida e fim da tentativa (A1.5).
+
+### Desenvolvimento, 29/10: modelagem de dados do `agenor_v2` (A1.3b)
+
+A #341 (orquestração) começou pelo levantamento no código e parou ali, por decisão do Lucas: antes de escrever os endpoints sobre as tabelas, o modelo delas precisa ser pensado.
+
+- **Por que entrou:** a A1.3 foi da lista de tabelas do ADR-002 direto para a migração, sem uma etapa de modelagem. Só o lado do worker e do despachante foi pensado, e o modelo trouxe colunas que repetem outras (`collection.technical_failures` e `business_retries` contam o que já está nas tentativas; `request_payload` repete as colunas de entrada), colunas de partes que ainda não foram detalhadas (ZIP, listagem do consumidor) e dados de diagnóstico misturados com estado.
+- **Numeração:** A1.3b, logo depois da A1.3, porque refaz o resultado dela sem renumerar as atividades seguintes; a A1.3 continua ✅ com o seu histórico. A A1.5, A1.6, A1.8, A1.11 e A1.16 passaram a depender da A1.3b.
+- **Critério (decisão do Lucas):** o modelo puxa só o que a nova arquitetura precisa agora: a API do worker e do Launcher, o despachante, a retentativa, o abandono e a regra de status (ADR-002 a ADR-004). O contrato que o front usa hoje (`contrato/consumidor-dc-atual.openapi.json`) é referência, não requisito: um campo dele só vira coluna se um fluxo atual precisar. O fluxo completo do consumidor ainda não é conhecido, então o modelo é declaradamente inicial e muda por migração quando cada parte for detalhada.
+- **Entregável:** `docs/arquitetura/modelo-de-dados.md`, e não um ADR: é um catálogo vivo (cada coluna com para que serve, quem escreve e quem lê), que muda a cada migração; as decisões que saírem dele entram nos ADRs que elas afetam (ADR-002, ADR-004 e ADR-007).
+- **Confirmado no código do DC atual:** a `ic_service_execution` é a auditoria das chamadas HTTP do coletor DARF ao Integra Contador (`POST /coleta-documentos/{id}/ic-executions`), não uma execução de coleta.
+- **Brecha no harness:** nada exigia modelagem antes de uma migração. A proposta é que toda tabela ou coluna do `agenor_v2` entre primeiro no `modelo-de-dados.md`, e que o `revisor-isolamento-banco` confira se o modelo e o documento batem.
+
+- **Aprovado pelo Lucas (29/10)**, com as 7 decisões do documento:
+  1. `collection.technical_failures` e `business_retries` saem: a retentativa conta as tentativas da coleta quando uma termina, com a linha da coleta travada (ADR-004).
+  2. `request_payload` sai: repetia as colunas de entrada.
+  3. Um tipo só: `attempt.attempt_type` e `collection.zip_file_key` saem. O ZIP continua worker; como ele se liga à coleta no banco se decide na fase 4 (ADR-007).
+  4. `job_created_at`, `job_name`, `pod_name`, `worker_version`, `started_at` e `finished_at` saem da tentativa e vão para os eventos `attempt.job_created`, `attempt.started` e `attempt.finished`. A API não muda (ADR-002).
+  5. `item.report_type` em texto, sem catálogo: quem conhece os documentos de cada tipo é o worker.
+  6. Nenhum campo do contrato do front vira coluna agora: cada um está marcado como derivado ou fora agora.
+  7. `updated_at` sai da coleta e da tentativa (o item mantém o dele, porque não há evento por item), e os índices sem leitor saem.
+- **Migração:** a `0001` foi regerada pelo autogenerate (`20261029_a057fe7dbe85_agenor_coleta_inicial.py`), com edição só no docstring, e substitui a `9fd63faacdde` da A1.3, que só tinha sido aplicada no banco local. No `local/`, o schema `agenor_v2` foi apagado e recriado pela migração nova. O `public` ficou idêntico antes e depois (colunas, constraints e versão do Alembic), o DC atual reiniciou com health 200 e o `check.sh` passou.
+- **Testes:** 424 passam e 3 são pulados no DC. Só o `test_models_agenor_v2.py` mudou: tirou o `attempt_type` e o `technical_failures`.
+- **Harness:** o `AGENTS.md` do DC e a skill `nova-migracao-agenor-coleta` (passo 0) exigem que toda tabela, coluna ou índice entre primeiro no `modelo-de-dados.md`, com o ok do Lucas. O `revisor-isolamento-banco` ganhou a regra 6: o modelo e o documento batem.
+- **`revisor-isolamento-banco`:** ISOLADO, já com a regra 6. Os dois achados da regra 6 eram do documento, que não registrava os padrões das colunas nem o tamanho (32) dos campos de status; foram corrigidos. Observação dele, anotada no documento para a A1.6: o `onupdate` do `item.updated_at` não vale num `INSERT … ON CONFLICT DO UPDATE`, então o upsert grava `updated_at = now()` explicitamente.
+- **Banco local com a revisão antiga:** um `agenor_v2` que tenha a `9fd63faacdde` não migra mais ("Can't locate revision"). O remédio é `DROP SCHEMA agenor_v2 CASCADE` no Postgres do `local/`, só do v2, e `python -m app.migrate`. O DC v2 no kind usa o mesmo Postgres do compose, já recriado.
+- **Schema renomeado para `agenor_coleta` (decisão do Lucas, 29/10).** Antes do commit da A1.3b, o Lucas questionou o nome `agenor_v2`: o schema não é temporário e, depois da virada, um "v2" no nome perderia o sentido. Ficou `agenor_coleta`, que diz que o schema é da coleta do Agenor feita por nós. A pasta de trabalho continua `agenor-v2`, e o "v2" do `/api/v2` (versão da API) e o nome "DC v2" também ficam.
+  - Era o momento mais barato: a migração só tinha sido aplicada no banco local. Não sabemos se o banco de produção tem um schema com esse nome; o Lucas acredita que não, e a conferência vai junto com o pedido 11 ao cliente.
+  - Mudaram o `SCHEMA` do modelo (o `env.py` e os testes o usam), os nomes dos arquivos (`app/models/agenor_coleta.py`, `tests/test_*_agenor_coleta.py`, o ADR-001 e a skill `nova-migracao-agenor-coleta`) e as menções nos documentos, no `local/`, no harness e num docstring do `agenor-common`. As entradas anteriores deste contexto continuam com `agenor_v2`, porque registram o que aconteceu.
+  - A `0001` foi regerada outra vez: `20261029_a057fe7dbe85_agenor_coleta_inicial.py`. No `local/`, o `agenor_v2` foi apagado e o `agenor_coleta` criado pela migração. O `public` ficou idêntico, o DC atual reiniciou com health 200, o DC v2 foi reconstruído no compose e o `check.sh` e o `verify.sh` passaram.
+
+**Próximo:** a #341 (A1.5 a A1.11: DC 2.0, orquestração), a partir dos endpoints de entrada, início, sinal de vida e fim da tentativa (A1.5), sobre o modelo da A1.3b.

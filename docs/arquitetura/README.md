@@ -10,7 +10,7 @@ Agenor → Document Collector v2 → fila → Launcher → Job do worker (um por
 
 | ADR | Decisão |
 |---|---|
-| [ADR-001](adr-001-isolamento-no-schema-agenor-v2.md) | O DC v2 roda em release própria, no mesmo banco, isolado no schema `agenor_v2` |
+| [ADR-001](adr-001-isolamento-no-schema-agenor-coleta.md) | O DC v2 roda em release própria, no mesmo banco, isolado no schema `agenor_coleta` |
 | [ADR-002](adr-002-tentativa-e-status.md) | A tentativa é a unidade de execução, e o DC é o único dono do status |
 | [ADR-003](adr-003-contratos.md) | Evento da fila só com identificadores; o worker busca a entrada no DC; APIs do worker, do Launcher e do consumidor |
 | [ADR-004](adr-004-despachante-e-retentativa.md) | A tabela de tentativas é a fila de verdade; o DC decide capacidade, retentativa e abandono |
@@ -19,6 +19,10 @@ Agenor → Document Collector v2 → fila → Launcher → Job do worker (um por
 | [ADR-007](adr-007-workers-por-tipo-com-base-comum.md) | Um worker por tipo, com base comum, duas imagens e extração em JSON no bucket |
 | [ADR-008](adr-008-observabilidade.md) | Observabilidade no padrão do Agnes Collector, com logs em JSON |
 | [ADR-009](adr-009-virada-unica-pelos-consumidores.md) | Virada única pelos consumidores, sem chave de ambiente |
+
+## Modelo de dados
+
+[modelo-de-dados.md](modelo-de-dados.md): cada tabela e coluna do `agenor_coleta`, com para que serve, quem escreve, quem lê e o que substitui no `public`, e o de/para das tabelas do DC atual. Toda tabela ou coluna nova entra nele antes do modelo e da migração.
 
 ## Infra
 

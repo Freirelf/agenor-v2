@@ -48,7 +48,7 @@ Subagentes entram quando ajudam: uma revisão independente (por exemplo, o `revi
 ## Regras comuns
 
 - **Local primeiro.** Tudo é desenvolvido e validado localmente, com fila e armazenamento locais. Os ambientes (dev, stg, prd) são a última etapa.
-- **Só o schema `agenor_v2`.** O v2 divide o banco com o DC atual e o AGuiar, mas escreve só no `agenor_v2`. Nunca cria, altera ou grava tabelas do `public`, e a `alembic_version` do v2 fica dentro do `agenor_v2`. Os status novos (`CANCELLED`, `NO_SESSION`, `INFRA_FAILED`, `TIMED_OUT`) existem só no v2.
+- **Só o schema `agenor_coleta`.** O v2 divide o banco com o DC atual e o AGuiar, mas escreve só no `agenor_coleta`. Nunca cria, altera ou grava tabelas do `public`, e a `alembic_version` do v2 fica dentro do `agenor_coleta`. Os status novos (`CANCELLED`, `NO_SESSION`, `INFRA_FAILED`, `TIMED_OUT`) existem só no v2.
 - **Infra é do cliente.** Não altere `bitbucket-pipelines.yml`, `sonar-project.properties`, `helm/`, `kubernetes/` nem values. Um problema nesses arquivos vira alerta ao cliente (§3.10 do plano), não correção. **Não escrevemos chart nem values:** o DC v2 e o Launcher sobem no kind com manifestos simples em `local/`, que é nosso e só local, e para o cliente vai o `infra.md`.
 - **Nenhuma credencial** no código, nos values do Helm ou nos commits. Tudo vem de Secret ou variável de ambiente. Não leia nem copie arquivos `.env`.
 - **Commit no repositório do serviço alterado.** Uma mudança que atravessa repositórios vira um commit em cada um. Esta pasta só recebe commits de documentação e do que atravessa os repositórios (`scripts/agent/`, `local/`).

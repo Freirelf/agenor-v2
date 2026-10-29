@@ -3,6 +3,7 @@
 - **Status:** Aceito
 - **Data:** 2026-10-27
 - **Origem:** plano, §3.0, §3.2 ("Configuração da fila") e §3.4 ("Retentativa", "Despachante", "Limites iniciais", "Abandono", "Duas contagens"); padrão do ADR-002 do Agnes Collector
+- **Atualizado:** 2026-10-29 (A1.3b): as contagens saem das tentativas, sem contador na coleta; o tipo do despachante é o da coleta
 
 ## Contexto
 
@@ -17,7 +18,7 @@
 
 ### Despachante
 
-A **tabela de tentativas é a fila de verdade**; a OCI Queue só transporta o que pode rodar agora. Para cada tipo, o despachante:
+A **tabela de tentativas é a fila de verdade**; a OCI Queue só transporta o que pode rodar agora. Para cada tipo de coleta (o tipo da tentativa é o da coleta), o despachante:
 
 1. pega um lock no banco;
 2. calcula as vagas: limite do tipo menos as tentativas despachadas e não concluídas, respeitando também o limite total;
@@ -42,6 +43,7 @@ Duas contagens separadas, por coleta:
 - `NO_SESSION` deixa a coleta em `WAITING_SESSION` enquanto espera.
 - `FAILED` não recuperável (ex.: procuração inválida) leva a coleta a `FAILED` imediatamente.
 - `CANCELLED` não conta em nenhuma das duas.
+- As contagens não são gravadas: saem das tentativas da coleta no momento em que uma termina (por status e `recoverable`), com a linha da coleta travada (`SELECT … FOR UPDATE`). É a mesma trava que serializa o fim da tentativa, o aviso do Launcher e o abandono da mesma coleta, então não há contador para ficar fora de sincronia. A espera da retentativa de negócio sai do número de retentativas de negócio já feitas.
 - A espera é gravada como hora de retentativa na nova tentativa; o despachante só a publica quando a hora chega.
 
 ### Abandono
