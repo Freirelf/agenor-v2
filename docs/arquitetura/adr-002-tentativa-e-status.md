@@ -45,7 +45,7 @@ QUEUED → STARTING → RUNNING → um final
 Atalhos permitidos, além do ciclo linear (tabela em `app/services/orchestration/states.py` do DC, com teste de cada transição; atualizado em 29/10):
 
 - `QUEUED → RUNNING`: o `start` do worker pode chegar antes do aviso `JOB_CREATED` do Launcher.
-- `QUEUED` ou `STARTING` → qualquer final: o Launcher (Job que falhou), o abandono e o cancelamento encerram a tentativa em qualquer ponto. Hoje o `finish` do worker também é aceito antes do `start`.
+- `QUEUED` ou `STARTING` → qualquer final: o Launcher (Job que falhou), o abandono e o cancelamento encerram a tentativa em qualquer ponto. O `finish` do worker só vale depois do `start`, salvo o `CANCELLED` de uma coleta cancelada (A1.6).
 - De um status final não se sai: um aviso atrasado não reabre a tentativa.
 
 - `QUEUED`: criada, aguardando o despachante ou já na fila. A publicação é registrada em `dispatched_at`, não no status.
@@ -64,7 +64,23 @@ O worker registra cada item (documento ou competência) com uma **chave idempote
 
 O worker **nunca grava o status da coleta**. Ele informa itens e o resultado da tentativa, e o DC calcula o status a partir disso. É o único escritor.
 
-Os valores do status da coleta continuam os de hoje, para não quebrar quem consulta: `PENDING`, `PROCESSING`, `WAITING_SESSION`, `FINISHED`, `PARTIALLY_FINISHED`, `FINISHED_EMPTY`, `FAILED` e `FILE_NOT_FOUND` (este último está no código da staging, embora o plano não o listasse). A regra exata do cálculo (itens × resultado da tentativa → status) é fechada na A1.7 e registrada aqui.
+Os valores do status da coleta continuam os de hoje, para não quebrar quem consulta: `PENDING`, `PROCESSING`, `WAITING_SESSION`, `FINISHED`, `PARTIALLY_FINISHED`, `FINISHED_EMPTY`, `FAILED` e `FILE_NOT_FOUND` (este último está no código da staging, embora o plano não o listasse). A regra do cálculo foi fechada na A1.7 (29/10), num ponto só (`app/services/orchestration/collection_status.py` do DC), a partir das duas últimas tentativas e da contagem dos itens:
+
+| Última tentativa | Status da coleta |
+|---|---|
+| `QUEUED`, número 1 | `PENDING` (o Job ainda não foi criado) |
+| `QUEUED`, retentativa depois de `NO_SESSION` | `WAITING_SESSION` |
+| `QUEUED`, outra retentativa (técnica ou `FAILED` recuperável) | `PROCESSING` |
+| `STARTING` ou `RUNNING` | `PROCESSING` |
+| `SUCCEEDED` | pelos itens: nenhum `FAILED` e algum `FINISHED` (com arquivo) → `FINISHED`; nenhum `FAILED` e nenhum com arquivo, ou sem itens → `FINISHED_EMPTY`; `FAILED` com outros → `PARTIALLY_FINISHED`; todos `FAILED` → `FAILED` |
+| outro final, sem nova tentativa (falha não recuperável, retentativas esgotadas, cancelamento) | `PARTIALLY_FINISHED` se algum item tem arquivo; senão `FAILED` |
+
+- O `status_text` diz o motivo (o erro da tentativa, "Coleta cancelada" ou a espera de sessão) e a contagem dos itens.
+- Coleta cancelada cujo worker terminou com `SUCCEEDED` (ele só para entre um item e outro) fica pelo resultado dos itens: o que foi coletado vale. "Coleta cancelada" aparece só quando a tentativa termina em `CANCELLED`.
+- `SUCCEEDED` com itens `FAILED` não gera retentativa: ela depende só do resultado da tentativa ([ADR-004](adr-004-despachante-e-retentativa.md)).
+- O cálculo não conhece a política de retentativa: a nova tentativa é criada antes (A1.9) e passa a ser a última.
+- Transições da coleta numa tabela (`COLLECTION_TRANSITIONS` em `states.py`): `PENDING → PROCESSING ⇄ WAITING_SESSION`, e de qualquer um desses para um final. Um status final não se reabre: coletar de novo é uma coleta nova. `FILE_NOT_FOUND` não é produzido (a regra do DC atual também nunca o produzia).
+- Cada mudança grava o evento `collection.status_changed` (`old`, `new`).
 
 ### Histórico de eventos
 

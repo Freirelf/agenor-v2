@@ -15,6 +15,12 @@ O plano dá a direção; cada atividade (ou tarefa do Squads) é uma parte peque
 
 Uma tarefa nova do Squads começa numa sessão nova, a partir do status no topo do plano e do **Próximo:** do contexto.
 
+## Herdado, gambiarras e brechas
+
+- **O que não faz sentido no modelo novo sai.** Gambiarra, brecha e o que está fora de padrão são remodelados, não portados nem mantidos "por compatibilidade". "Aceitar e ignorar" um campo também é brecha.
+- **Se houver uma regra de que o sistema precisa**, ela ganha a melhor solução viável, simples e objetiva. Exemplo: o `force` herdado (duplicar coleta em andamento ou baixar tudo de novo) saiu em 29/10, e no lugar ficou "sem coleta igual em andamento, coletar de novo é uma coleta nova" ([modelo de dados](arquitetura/modelo-de-dados.md), decisão 8).
+- **Nada fica aberto sem dono.** O que uma atividade deixa para outra (um resto do herdado, um aviso da revisão, uma regra que a próxima precisa respeitar) entra na linha da atividade que vai resolvê-lo, na §6 do plano, como **Levar:**, e no registro do dia no contexto. A atividade que recebe começa por esses itens e os tira da linha quando os resolve.
+
 ## Pronto quando
 
 Uma atividade só está pronta quando:
@@ -25,6 +31,7 @@ Uma atividade só está pronta quando:
 - o que muda o contrato atualizou o `agenor-common` e o OpenAPI gerado;
 - quando a atividade mexe no fluxo entre serviços, ele foi exercitado no `local/` (`check.sh`);
 - a documentação foi atualizada (abaixo);
+- nada ficou aberto sem dono: cada pendência está no **Levar:** da atividade que a resolve, e os **Levar:** desta atividade foram resolvidos;
 - o Lucas viu o que entra em cada commit e confirmou.
 
 ## Documentação: o que vai onde
@@ -32,6 +39,7 @@ Uma atividade só está pronta quando:
 | Mudou… | Atualize |
 |---|---|
 | Status de uma atividade, ordem, escopo, risco | `docs/PLANO_AGENOR_2_0.md` (status no topo e §6) |
+| Algo que fica para outra atividade | A linha dela na §6 do plano (**Levar:**) e o contexto |
 | O que foi feito e decidido no dia | `docs/CONTEXTO_E_DECISOES.md`, terminando em **Próximo:** |
 | Uma decisão técnica | O ADR dela (linha "Atualizado") ou um ADR novo |
 | Tabela, coluna ou índice | `docs/arquitetura/modelo-de-dados.md`, antes do código |
@@ -52,7 +60,7 @@ Documentos em português, frases curtas, sem prazo nem data de entrega (os prazo
 
 - **`revisor-isolamento-banco`** em toda mudança de `alembic/`, `app/models/`, `app/repositories/` ou SQL do DC.
 - **Revisão de código** (`/code-review`) antes de commitar uma atividade inteira ou uma mudança grande em lógica concorrente (despachante, travas, retentativa).
-- Achado da revisão é corrigido antes do commit, ou registrado no contexto com o motivo de ficar para depois.
+- Achado da revisão é corrigido antes do commit, ou vai para o **Levar:** da atividade que o resolve (§6 do plano) e para o contexto, com o motivo de ficar para depois.
 
 ## Dependências
 

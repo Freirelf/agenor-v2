@@ -26,7 +26,7 @@ No 2.0 há quatro fronteiras: consumidor → DC, DC → fila → Launcher, Launc
 ### 2. Entrada do Job (Launcher → worker)
 
 - O Launcher cria o Job com `ATTEMPT_ID`, `COLLECTED_ID` e `COLLECTION_TYPE` como variáveis de ambiente, mais a configuração do tipo.
-- Ao subir, o worker **busca a entrada completa no DC** pelo `attempt_id`: cliente, procurador, filtros e `force`. Dados fiscais e pessoais não ficam na definição do Job.
+- Ao subir, o worker **busca a entrada completa no DC** pelo `attempt_id`: cliente, procurador e filtros (o `force` saiu em 29/10: [modelo de dados](modelo-de-dados.md), decisão 8). Dados fiscais e pessoais não ficam na definição do Job.
 - Se a tentativa não for mais a vigente, o DC devolve vazio e o worker encerra sem fazer nada.
 
 ### 3. API do worker no DC

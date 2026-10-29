@@ -1,6 +1,6 @@
 # Modelo de dados do `agenor_coleta`
 
-- **Status:** aprovado pelo Lucas em 29/10 (A1.3b). Descreve o `app/models/agenor_coleta.py` e a revisão head do DC v2 (`20261029_a057fe7dbe85_agenor_coleta_inicial.py`), e muda junto com eles.
+- **Status:** aprovado pelo Lucas em 29/10 (A1.3b). Descreve o `app/models/agenor_coleta.py` e a revisão head do DC v2 (`20261029_af4ac1ae7df9_collection_sem_force.py`, sobre a inicial `a057fe7dbe85`), e muda junto com eles.
 - **Origem:** ADR-001 (isolamento), ADR-002 (tentativa e status), ADR-003 (contratos), ADR-004 (despachante e retentativa), ADR-007 (ZIP e extração) e o modelo da A1.3 (revisão `9fd63faacdde`, feita sem esta etapa e substituída pela `a057fe7dbe85`).
 
 ## Para que serve este documento
@@ -42,7 +42,7 @@ collection 1 ── N event          attempt_id opcional
 
 ## Decisões desta modelagem
 
-Os pontos levantados na #341, cada um com a recomendação aprovada em 29/10 e aplicada na revisão `a057fe7dbe85`.
+Os pontos levantados na #341, cada um com a recomendação aprovada em 29/10 e aplicada na revisão `a057fe7dbe85` (a decisão 8, na `af4ac1ae7df9`).
 
 ### 1. Contagens de falha: derivadas das tentativas
 
@@ -53,11 +53,11 @@ Os pontos levantados na #341, cada um com a recomendação aprovada em 29/10 e a
 - falhas técnicas: tentativas da coleta com `INFRA_FAILED` ou `TIMED_OUT` (o abandono termina em `INFRA_FAILED`);
 - retentativas de negócio: tentativas com `NO_SESSION` ou `FAILED` com `recoverable = true`. A espera seguinte (5, 15, 30, 60 min…) sai desse número.
 
-É uma consulta pequena (uma coleta tem poucas tentativas), pelo índice de `(collection_id, number)`. Ela roda com a linha da coleta travada (`SELECT … FOR NO KEY UPDATE`, que não bloqueia quem só insere itens ou eventos da coleta), a mesma trava que serializa o fim da tentativa, o aviso do Launcher e o abandono da mesma coleta. Assim, não há contador para ficar fora de sincronia. ADR-004 ganha essa regra.
+É uma consulta pequena (uma coleta tem poucas tentativas), pelo índice de `(collection_id, number)`, o mesmo que o cálculo do status (A1.7) usa para ler as últimas tentativas. Ela roda com a linha da coleta travada (`SELECT … FOR NO KEY UPDATE`, que não bloqueia quem só insere itens ou eventos da coleta), a mesma trava que serializa o fim da tentativa, o aviso do Launcher e o abandono da mesma coleta. Assim, não há contador para ficar fora de sincronia. ADR-004 ganha essa regra.
 
 ### 2. `request_payload`: sai
 
-Repete `collection_type`, `client_document`, `power_of_attorney_document`, `data_filters` e `force`, que são a entrada do worker. No DC atual, o front lia o pedido inteiro de volta; se a A1.16 precisar disso, ele é remontado dessas colunas (**derivado**).
+Repete `collection_type`, `client_document`, `power_of_attorney_document` e `data_filters`, que são a entrada do worker. No DC atual, o front lia o pedido inteiro de volta; se a A1.16 precisar disso, ele é remontado dessas colunas (**derivado**).
 
 ### 3. Um tipo só; o ZIP fica para quando for detalhado
 
@@ -97,6 +97,18 @@ Ver [a lista abaixo](#campos-do-contrato-do-front-que-o-modelo-não-tem): nenhum
 - **Índices sem leitor saem.** Os três índices de listagem da `collection` (por cliente, por status e por data) e os índices das chaves estrangeiras `item.attempt_id` e `event.attempt_id` não servem a nenhuma consulta definida. A A1.16 cria os índices das consultas que ela tiver.
 - **Status continuam texto com `CHECK` nomeado** (ADR-001).
 
+### 8. `force`: sai (29/10, #341)
+
+No DC atual, `force` tinha dois sentidos: na query do POST, criar a coleta mesmo com outra igual em andamento; no corpo de cinco tipos, ignorar a retomada e baixar tudo de novo. Nenhum faz sentido no 2.0, e o primeiro é um risco (duas coletas iguais disputam sessões do Agnaldo e acessam a Receita em dobro com o mesmo certificado).
+
+**Decisão (Lucas, 29/10): sai da `collection`, do `input` do worker e do `agenor_common`.** No lugar, três regras:
+
+- coletar de novo é uma coleta nova, que começa sem itens concluídos (os itens são de cada coleta);
+- dentro da coleta, toda retentativa retoma: o worker pula os itens já concluídos (`done-items`);
+- não há coleta duplicada em andamento: a A1.16 recusa o pedido igual a uma coleta em andamento, com o id dela, sem atalho.
+
+Os schemas herdados do pedido do consumidor (`app/schemas/collection_requests/`, cinco tipos) ainda têm o `force` no corpo. Ele sai na A1.16, que também decide como tratar o campo que o front manda hoje, para não voltar escondido no `data_filters`.
+
 ## Tabelas
 
 Legenda da coluna "Muda", em relação ao modelo da A1.3: **=** ficou; **sai**; **muda**. As linhas riscadas estão aqui só para registrar o que saiu.
@@ -112,7 +124,7 @@ Uma linha por pedido. A entrada não muda depois de criada; o status é só do D
 | `client_document` | texto(14) | CNPJ do cliente | Consumidor | Worker (`input`) | `collected.client_document` | = |
 | `power_of_attorney_document` | texto(14) | CNPJ ou CPF do procurador (certificado). Obrigatório: sem ele, o worker não abre sessão | Consumidor | Worker (`input`) | `collected.power_of_attorney_document` (lá, opcional) | = |
 | `data_filters` | jsonb, padrão `{}` | Filtros do pedido, já normalizados pelo DC | Consumidor (DC normaliza) | Worker (`input`) | parte do `collected.request_payload` | = |
-| `force` | boolean, padrão `false` | Coletar de novo os itens já concluídos | Consumidor | Worker (`input`, decide se pula os concluídos) | query `force` do POST, não era gravado | = |
+| ~~`force`~~ | | | | | | sai (decisão 8) |
 | `request_user_id` | texto(256) | Quem pediu: a única auditoria do pedido de dados fiscais | Consumidor (header) | Auditoria; filtro da A1.16 | `collected.request_user_id` | = |
 | `request_user_name` | texto(512), opcional | Nome de quem pediu, junto do id | Consumidor (header) | Auditoria | `collected.request_user_name` | = |
 | `status` | texto(32) + CHECK (`CollectedStatus`, os 8 de hoje), padrão `PENDING` | Status da coleta | DC (A1.7), único escritor | Consumidor | `collected.status` | = |
@@ -135,7 +147,7 @@ Uma linha por vez que o DC manda executar a coleta (ADR-002). É também o que o
 |---|---|---|---|---|---|---|
 | `id` | uuid, PK | `attempt_id` da fila, do Job, dos logs e de toda chamada do worker | DC | todos | `collection_attempt.id` | = |
 | `collection_id` | uuid, FK `collection` | A coleta | DC | todos | `collection_attempt.collected_id` | = |
-| `number` | int, único com `collection_id` | Ordem da tentativa na coleta | DC | Worker (`input.attempt_number`), retentativa | `collection_attempt.attempt_number` | = |
+| `number` | int, único com `collection_id` | Ordem da tentativa na coleta | DC | Worker (`input.attempt_number`), retentativa, A1.7 (últimas tentativas e `status_text`) | `collection_attempt.attempt_number` | = |
 | `status` | texto(32) + CHECK (`AttemptStatus`), padrão `QUEUED` | Ciclo da tentativa (ADR-002) | DC, a partir do Launcher, do worker e da varredura | Despachante, abandono, retentativa, A1.7 | `collection_attempt.status` (outros valores) | = |
 | `not_before` | timestamptz, padrão `now()` | Hora a partir da qual pode ser despachada: a espera da retentativa. O padrão deixa a primeira tentativa pronta para despachar na hora | DC (A1.9) | Despachante | `collection_attempt.next_attempt_at` | = |
 | `dispatched_at` | timestamptz, opcional | Publicada na fila e confirmada. Vazia: falta publicar | Despachante | Despachante (vagas e republicação), abandono (60 min sem início) | `collection_attempt.queued_at` | = |
@@ -169,12 +181,12 @@ Uma linha por item da coleta, pela chave que o worker dá. Uma nova tentativa at
 | `competence` | texto(32), opcional | Competência ou período do item | Worker | Consumidor (A1.16) | `collection_execution.competence` | = |
 | `file_key` | texto(1024), opcional | Chave do arquivo no bucket (ADR-007) | Worker | `done-items`, download (A1.16) | `collection_execution.uri_files` | = |
 | `extraction_key` | texto(1024), opcional | Chave do JSON da extração no bucket (ADR-007) | Worker | Consumo das extrações (fase 5) | as tabelas `*_extract` | = |
-| `error_message` | texto, opcional | Motivo de um item `FAILED` ou `FILE_NOT_FOUND` | Worker | A1.7 (`status_text`), consumidor | `collection_execution.error_message` | = |
+| `error_message` | texto, opcional | Motivo de um item `FAILED` ou `FILE_NOT_FOUND` | Worker | Consumidor | `collection_execution.error_message` | = |
 | `metadata` | jsonb, padrão `{}` | Dados do item próprios de cada tipo (ex.: versão e identificador do arquivo do DCTF) | Worker | Consumidor, quando o tipo for detalhado | `collection_execution.tipo_versao_documento`, `identificador_arquivo`, `file_id` | = |
 | `created_at` | timestamptz, padrão `now()` | Primeira vez que o item foi informado | DC | Diagnóstico | `collection_execution.created_at` | = |
 | `updated_at` | timestamptz, padrão `now()` | Última vez que uma tentativa informou o item (não há evento por item, decisão 7). O `onupdate` do modelo não vale num `INSERT … ON CONFLICT DO UPDATE`: o upsert da A1.6 grava `updated_at = now()` explicitamente | DC | Diagnóstico | — | = |
 
-Índice: único `(collection_id, key)`, que serve ao `ON CONFLICT` do upsert dos itens (A1.6) e ao `done-items` (prefixo `collection_id`).
+Índice: único `(collection_id, key)`, que serve ao `ON CONFLICT` do upsert dos itens (A1.6) ao `done-items` e à contagem por status da A1.7 (prefixo `collection_id`).
 
 `report_type`, `competence`, `error_message` e `extraction_key` ficam como colunas, e não no `metadata`, porque fazem parte do contrato do worker já definido (`ItemReport`, A1.1): são o resultado da coleta, com tipo e tamanho validados, e não diagnóstico.
 
@@ -258,12 +270,12 @@ Filtros da listagem: `client_document`, `power_of_attorney_document`, `request_u
 
 | Tabela | Sai | Muda |
 |---|---|---|
-| `collection` | `request_payload`, `technical_failures`, `business_retries`, `zip_file_key`, `finished_at`, `updated_at`; os 3 índices de listagem | — |
+| `collection` | `request_payload`, `technical_failures`, `business_retries`, `zip_file_key`, `finished_at`, `updated_at`; os 3 índices de listagem; `force` (29/10, decisão 8) | — |
 | `attempt` | `attempt_type`, `job_created_at`, `job_name`, `pod_name`, `worker_version`, `started_at`, `finished_at`, `updated_at` | índices do despachante sem `attempt_type` |
 | `item` | índice de `attempt_id` | — |
 | `event` | índice de `attempt_id` | — |
 
-Fora do banco: ADR-002 (o que vai para o evento, sem evento por item), ADR-004 (contagens derivadas das tentativas e a trava da coleta) e ADR-007 (o ZIP continua worker; a ligação com a coleta se decide na fase 4). Nenhuma mudança no `agenor-common`: a API e o evento da fila ficam como estão.
+Fora do banco: ADR-002 (o que vai para o evento, sem evento por item), ADR-004 (contagens derivadas das tentativas e a trava da coleta) e ADR-007 (o ZIP continua worker; a ligação com a coleta se decide na fase 4). Na A1.3b, nenhuma mudança no `agenor-common`; com a decisão 8, o `force` saiu do `AttemptInputData`. O evento da fila não mudou.
 
 ## Como mudar o modelo
 

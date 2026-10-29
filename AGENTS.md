@@ -33,7 +33,7 @@ Os cinco repositórios estão no GitHub (`origin`). O Bitbucket do cliente entra
 - Arquitetura: `docs/arquitetura/visao-geral.md` (as peças, o caminho de uma coleta e qual documento manda em cada assunto).
 - As decisões técnicas viram ADRs em `docs/arquitetura/`. Consulte o ADR antes de mudar algo que ele cobre.
 - O modelo de dados do schema `agenor_coleta` está em `docs/arquitetura/modelo-de-dados.md`: cada tabela e coluna, com para que serve, quem escreve e quem lê. Toda tabela, coluna ou índice entra nele, com o ok do Lucas, antes do modelo e da migração (skill `nova-migracao-agenor-coleta`).
-- **Ao concluir uma tarefa do Squads** (#337 em diante, ligadas às atividades na §6 do plano): atualize o status no topo do plano (o que foi concluído e a próxima tarefa) e o registro do dia no `docs/CONTEXTO_E_DECISOES.md`, terminando em **Próximo:**. Depois, mostre ao Lucas o que entraria em cada commit, por repositório, e só commite com a confirmação dele. O Squads é atualizado pelo Lucas.
+- **Ao concluir uma tarefa do Squads** (#337 em diante, ligadas às atividades na §6 do plano): atualize o status no topo do plano (o que foi concluído e a próxima tarefa) e o registro do dia no `docs/CONTEXTO_E_DECISOES.md`, terminando em **Próximo:**. O que fica para outra atividade vai para o **Levar:** da linha dela na §6 do plano (nada aberto sem dono; ver `docs/padroes-de-desenvolvimento.md`). Depois, mostre ao Lucas o que entraria em cada commit, por repositório, e só commite com a confirmação dele. O Squads é atualizado pelo Lucas.
 
 ## Como trabalhamos cada atividade
 

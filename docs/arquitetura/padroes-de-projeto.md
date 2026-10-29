@@ -197,7 +197,7 @@ def transition(attempt: Attempt, new_status: AttemptStatus) -> None:
     attempt.status = new_status
 ```
 
-**Referência:** `app/services/orchestration/states.py` (`ATTEMPT_TRANSITIONS`, `transition_attempt`), com o teste de cada transição em `tests/test_services_orchestration_states.py`. A tabela da coleta entra assim na A1.7.
+**Referência:** `app/services/orchestration/states.py` (`ATTEMPT_TRANSITIONS`, `transition_attempt`), com o teste de cada transição em `tests/test_services_orchestration_states.py`. A da coleta (`COLLECTION_TRANSITIONS`, `transition_collection`) entrou na A1.7, no mesmo módulo e no mesmo teste.
 
 #### Command
 
