@@ -303,3 +303,29 @@ A #341 (orquestração) começou pelo levantamento no código e parou ali, por d
   - A `0001` foi regerada outra vez: `20261029_a057fe7dbe85_agenor_coleta_inicial.py`. No `local/`, o `agenor_v2` foi apagado e o `agenor_coleta` criado pela migração. O `public` ficou idêntico, o DC atual reiniciou com health 200, o DC v2 foi reconstruído no compose e o `check.sh` e o `verify.sh` passaram.
 
 **Próximo:** a #341 (A1.5 a A1.11: DC 2.0, orquestração), a partir dos endpoints de entrada, início, sinal de vida e fim da tentativa (A1.5), sobre o modelo da A1.3b.
+
+### Desenvolvimento, 29/10: #341 (A1.5 a A1.11), DC 2.0 orquestração
+
+- **Plano de execução (aprovado pelo Lucas em 29/10).** Ordem: fundação, A1.11, A1.5, A1.6, A1.7, A1.9, A1.8, A1.10. O despachante vem depois da retentativa porque a varredura dele também roda o abandono. Nenhuma mudança de tabela prevista. Decisões, todas com a recomendação aceita:
+  1. **Status da coleta (A1.7):** `PENDING` até o Job ser criado; `PROCESSING` com o Job criado, o worker rodando ou uma retentativa técnica ou de negócio (`FAILED` recuperável) esperando; `WAITING_SESSION` com retentativa esperando por `NO_SESSION`. No fim, pelos itens: todos com arquivo → `FINISHED`; sem arquivo ou todos `FILE_NOT_FOUND` → `FINISHED_EMPTY`; concluídos e `FAILED` misturados → `PARTIALLY_FINISHED`; todos `FAILED` → `FAILED`. Retentativas esgotadas ou falha não recuperável: `FAILED`, ou `PARTIALLY_FINISHED` se algum item já tiver arquivo, com o motivo no `status_text`. O status `FILE_NOT_FOUND` da coleta não é produzido (a regra do DC atual também nunca o produzia). Vai para o ADR-002.
+  2. **Limite da retentativa de negócio:** 10 por padrão (cerca de 8 h de espera), configurável por tipo. O ADR-004 dizia "até o limite do tipo", sem número.
+  3. **Varredura dentro do processo da API**, a cada 1 min, com `pg_try_advisory_xact_lock`: só uma réplica varre por vez, sem Deployment novo para o cliente.
+  4. **Vigente e cancelada:** vigente é a tentativa não encerrada. O `active` do `input` e do `heartbeat` também exige a coleta não cancelada. Numa coleta cancelada, `items` e `finish` continuam aceitos (o worker precisa encerrar com `CANCELLED`). `CANCELLED` do worker sem cancelamento pedido recebe 409, para não gerar tentativas novas sem fim.
+  5. **Criação da coleta:** `create_collection()` só de domínio nesta tarefa (coleta, tentativa 1, eventos e despacho); a rota é da A1.16.
+  6. **Achado: `force`.** No DC atual era "criar a coleta mesmo com outra em andamento", não "coletar de novo os itens concluídos", como dizem o contrato e o modelo. A coluna fica; o uso dela e a correção da descrição no `agenor-common` e no `modelo-de-dados.md` ficam para a A1.16.
+- **Fundação ✅:** `get_session` (a transação é do serviço; o `get_db` herdado fica sem uso no app), `app/repositories/coleta.py` e o pacote `app/services/orchestration/`.
+- **A1.11 ✅:** catálogo fechado `EventName` (os 8 eventos do modelo) e `record_event` (autor fixo por evento, salvo o `attempt.finished`; `attempt.*` exige `attempt_id`; `metadata` convertido para JSON; o evento entra na transação da mudança). O `modelo-de-dados.md` registra o catálogo como fechado.
+- **`revisor-isolamento-banco`: ISOLADO.** Achados corrigidos: a chave `reason` do `attempt.created` e a redação de quando sai o `attempt.finished`, alinhadas entre código e documento. Observação acatada: a trava da coleta passou de `FOR UPDATE` para `FOR NO KEY UPDATE`, que serializa as transições da mesma coleta sem bloquear quem só insere itens ou eventos dela (a checagem da FK pede `FOR KEY SHARE`); ADR-004, `modelo-de-dados.md` e `AGENTS.md` do DC ajustados, com teste.
+- **Testes:** 435 passam e 3 são pulados no DC.
+
+- **A1.5 ✅:** `input`, `start`, `heartbeat` e `finish` (`app/services/orchestration/attempts.py`), com a regra de vigente e ativa da decisão 4.
+  - `start` e `finish` travam a coleta antes (`lock_attempt`). O `heartbeat` só faz um UPDATE condicional na tentativa e, se ela foi encerrada no meio, responde com o status final.
+  - Repetir `start` ou o mesmo `finish` responde 200 sem novo evento. Outro resultado depois do fim recebe 409 `ATTEMPT_NOT_CURRENT`; `CANCELLED` sem cancelamento, 409 `CANCEL_NOT_REQUESTED` (código novo, descrito no `openapi-v2.json` regerado).
+  - O fim ainda não cria retentativa nem recalcula o status: entra na A1.7 e na A1.9.
+- **`get_session` mudou de lugar:** foi para `app/routers/v2/session.py`, importando o `app.database` na chamada (como o `Settings` no `app/auth.py`). No `app/database.py`, o import exigia o `Settings` e o `scripts/exportar_openapi_v2.py` deixava de rodar sem configuração. **Incidente:** nessa falha, o erro de validação do pydantic imprimiu valores do `.env` do DC na saída do comando, inclusive uma senha. O `.env` não foi aberto e o valor não foi repetido nem usado. O Lucas foi avisado.
+- **`revisor-isolamento-banco`: ISOLADO.** Achados corrigidos: a resposta do `heartbeat` no meio de um fim (com teste de concorrência) e o `scalar_one()` no `lock_attempt`. **Aviso para a A1.10:** a varredura e o `infra-event` precisam entrar por `lock_attempt` ou `lock_collection` antes de tocar a tentativa. Um `SELECT attempt … FOR UPDATE` seguido da trava da coleta inverte a ordem e abre deadlock com o `finish`. O `heartbeat` deve continuar com uma trava só.
+- **Testes:** 450 passam e 3 são pulados no DC.
+
+- **Pausa (decisão do Lucas, 29/10):** a #341 para depois da A1.5, com commit do que está pronto, para definir os padrões de código e desenvolvimento antes de seguir.
+
+**Próximo:** padrões de código e desenvolvimento; depois, a #341 retoma pela A1.6 (itens idempotentes e itens já concluídos).

@@ -53,7 +53,7 @@ Os pontos levantados na #341, cada um com a recomendação aprovada em 29/10 e a
 - falhas técnicas: tentativas da coleta com `INFRA_FAILED` ou `TIMED_OUT` (o abandono termina em `INFRA_FAILED`);
 - retentativas de negócio: tentativas com `NO_SESSION` ou `FAILED` com `recoverable = true`. A espera seguinte (5, 15, 30, 60 min…) sai desse número.
 
-É uma consulta pequena (uma coleta tem poucas tentativas), pelo índice de `(collection_id, number)`. Ela roda com a linha da coleta travada (`SELECT … FOR UPDATE`), a mesma trava que serializa o fim da tentativa, o aviso do Launcher e o abandono da mesma coleta. Assim, não há contador para ficar fora de sincronia. ADR-004 ganha essa regra.
+É uma consulta pequena (uma coleta tem poucas tentativas), pelo índice de `(collection_id, number)`. Ela roda com a linha da coleta travada (`SELECT … FOR NO KEY UPDATE`, que não bloqueia quem só insere itens ou eventos da coleta), a mesma trava que serializa o fim da tentativa, o aviso do Launcher e o abandono da mesma coleta. Assim, não há contador para ficar fora de sincronia. ADR-004 ganha essa regra.
 
 ### 2. `request_payload`: sai
 
@@ -190,22 +190,22 @@ No formato do Agnes Collector (ADR-002). Guarda o que saiu das colunas pela regr
 | `message` | texto | Mensagem legível | DC | Consumidor | `property_reason` | = |
 | `author` | texto(32) + CHECK (`ROBOT`, `USER`, `SYSTEM`) | Worker, consumidor ou o próprio DC e o Launcher | DC | Consumidor | — | = |
 | `metadata` | jsonb, padrão `{}` | Detalhes (status antigo e novo, Job, pod, versão, erro) | DC | Diagnóstico | `old_value`, `new_value` | = |
-| `created_at` | timestamptz, padrão `now()` | Quando aconteceu | DC | Consumidor, diagnóstico | `event_date` | = |
+| `created_at` | timestamptz, padrão `now()` | Quando aconteceu (hora da transação; eventos da mesma transação desempatam pelo `id`) | DC | Consumidor, diagnóstico | `event_date` | = |
 
 Índice: `(collection_id, created_at)`, a leitura do histórico de uma coleta.
 
-Eventos previstos (o catálogo fecha na A1.11):
+Catálogo dos eventos, fechado na A1.11 (`app/services/orchestration/events.py`, `EventName`): o DC só grava estes nomes, e o evento entra na mesma transação da mudança que ele registra.
 
 | Nome | Autor | Quando | `metadata` |
 |---|---|---|---|
 | `collection.created` | `USER` | Pedido aceito | — |
 | `collection.status_changed` | `SYSTEM` | A1.7 muda o status | `old`, `new` |
 | `collection.cancelled` | `USER` | Cancelamento | — |
-| `attempt.created` | `SYSTEM` | Nova tentativa (primeira ou retentativa) | `number`, `not_before`, motivo |
+| `attempt.created` | `SYSTEM` | Nova tentativa (primeira ou retentativa) | `number`, `not_before`, `reason` (por que foi criada) |
 | `attempt.dispatched` | `SYSTEM` | Fila confirmou a publicação | — |
 | `attempt.job_created` | `SYSTEM` | Aviso `JOB_CREATED` do Launcher | `job_name` |
 | `attempt.started` | `ROBOT` | `start` do worker | `job_name`, `pod_name`, `worker_version` |
-| `attempt.finished` | `ROBOT` ou `SYSTEM` | `finish`, aviso de falha do Launcher ou abandono | `status`, `error_code`, `recoverable`, `infra_event` |
+| `attempt.finished` | `ROBOT` ou `SYSTEM` | `finish`, aviso do Launcher que encerra a tentativa, ou abandono | `status`, `error_code`, `recoverable`, `infra_event` |
 
 Os itens não geram um evento por mudança: a linha do item é o estado, e o volume (centenas de itens por coleta) não compensa.
 

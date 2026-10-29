@@ -43,7 +43,7 @@ Duas contagens separadas, por coleta:
 - `NO_SESSION` deixa a coleta em `WAITING_SESSION` enquanto espera.
 - `FAILED` não recuperável (ex.: procuração inválida) leva a coleta a `FAILED` imediatamente.
 - `CANCELLED` não conta em nenhuma das duas.
-- As contagens não são gravadas: saem das tentativas da coleta no momento em que uma termina (por status e `recoverable`), com a linha da coleta travada (`SELECT … FOR UPDATE`). É a mesma trava que serializa o fim da tentativa, o aviso do Launcher e o abandono da mesma coleta, então não há contador para ficar fora de sincronia. A espera da retentativa de negócio sai do número de retentativas de negócio já feitas.
+- As contagens não são gravadas: saem das tentativas da coleta no momento em que uma termina (por status e `recoverable`), com a linha da coleta travada (`SELECT … FOR NO KEY UPDATE`, que não bloqueia quem só insere itens ou eventos da coleta). É a mesma trava que serializa o fim da tentativa, o aviso do Launcher e o abandono da mesma coleta, então não há contador para ficar fora de sincronia. A espera da retentativa de negócio sai do número de retentativas de negócio já feitas.
 - A espera é gravada como hora de retentativa na nova tentativa; o despachante só a publica quando a hora chega.
 
 ### Abandono
