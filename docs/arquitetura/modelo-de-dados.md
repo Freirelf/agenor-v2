@@ -174,6 +174,8 @@ Uma linha por item da coleta, pela chave que o worker dá. Uma nova tentativa at
 | `created_at` | timestamptz, padrão `now()` | Primeira vez que o item foi informado | DC | Diagnóstico | `collection_execution.created_at` | = |
 | `updated_at` | timestamptz, padrão `now()` | Última vez que uma tentativa informou o item (não há evento por item, decisão 7). O `onupdate` do modelo não vale num `INSERT … ON CONFLICT DO UPDATE`: o upsert da A1.6 grava `updated_at = now()` explicitamente | DC | Diagnóstico | — | = |
 
+Índice: único `(collection_id, key)`, que serve ao `ON CONFLICT` do upsert dos itens (A1.6) e ao `done-items` (prefixo `collection_id`).
+
 `report_type`, `competence`, `error_message` e `extraction_key` ficam como colunas, e não no `metadata`, porque fazem parte do contrato do worker já definido (`ItemReport`, A1.1): são o resultado da coleta, com tipo e tamanho validados, e não diagnóstico.
 
 ### `event`: histórico

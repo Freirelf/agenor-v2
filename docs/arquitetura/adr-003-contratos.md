@@ -55,6 +55,7 @@ Solicitar a coleta, consultar o status, listar e baixar, **com o mesmo contrato 
 ### Regras comuns
 
 - Erros no formato `{"code", "message"}` (`ErrorResponse`). Uma escrita (`start`, `items`, `finish`) de uma tentativa que não é mais a vigente recebe 409 com `ATTEMPT_NOT_CURRENT`. `input` e `heartbeat` respondem 200 com `active=false`.
+- Os itens e o resultado só valem depois do `start` (A1.5 e A1.6, 29/10): antes dele, 409 com `ATTEMPT_NOT_STARTED`, salvo o `CANCELLED` de uma coleta cancelada. `CANCELLED` sem cancelamento pedido recebe 409 com `CANCEL_NOT_REQUESTED`. Tentativa ou coleta inexistente: 404 com `ATTEMPT_NOT_FOUND` ou `COLLECTION_NOT_FOUND`.
 - O worker informa só `SUCCEEDED`, `FAILED` (com erro tipado e `recoverable`), `NO_SESSION` ou `CANCELLED`. `INFRA_FAILED` e `TIMED_OUT` vêm do Launcher ou da detecção de abandono.
 - O contrato do consumidor a manter está retratado em `contrato/consumidor-dc-atual.openapi.json` do DC: as 7 chamadas que o front faz. As rotas legadas por tipo, a `coleta-completa` e a `reprocessar` ficam fora até aparecer um consumidor delas (conferido nos logs antes da virada).
 

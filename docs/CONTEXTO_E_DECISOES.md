@@ -395,4 +395,21 @@ A #341 (orquestração) começou pelo levantamento no código e parou ali, por d
 - **Testes:** DC 531 passam e 3 são pulados; `agenor-common` 46.
 - **`revisor-isolamento-banco`: ISOLADO.** O ADR-002 passou a registrar os atalhos da tabela (`QUEUED → RUNNING`; qualquer status vigente para um final; de um final não se sai). **Decisão aberta para o Lucas:** hoje o `finish` do worker é aceito com a tentativa ainda em `QUEUED` ou `STARTING`, sem `start` (comportamento da A1.5, e os testes usam esse caminho). A recomendação é aceitar o resultado do worker só depois do `start`, salvo o `CANCELLED`; decidir antes da A1.6.
 
-**Próximo:** a #341 retoma pela A1.6 (itens idempotentes e itens já concluídos), no padrão de código e de projeto.
+
+### Desenvolvimento, 29/10: #341 retomada, A1.6
+
+- **Decisão do Lucas (29/10): o resultado do worker só vale depois do `start`,** como o modelo novo espera (o `core` do worker sempre começa por ele, ADR-007). Com a tentativa em `QUEUED` ou `STARTING`, `finish` e `items` recebem 409 `ATTEMPT_NOT_STARTED` (código novo). A exceção é o `CANCELLED` de uma coleta cancelada. Os testes do `finish` passaram a chamar o `start` antes, e o ADR-003 registra os códigos `ATTEMPT_NOT_STARTED`, `CANCEL_NOT_REQUESTED`, `ATTEMPT_NOT_FOUND` e `COLLECTION_NOT_FOUND`.
+- **A1.6 ✅** (`app/services/orchestration/items.py`, `app/repositories/collection.py`):
+  - `items`: upsert `ON CONFLICT (collection_id, key) DO UPDATE`, com `attempt_id` da última tentativa que informou e `updated_at = now()` explícito, só com a tentativa `RUNNING` (aceito também numa coleta cancelada). O lote trava a tentativa em `FOR SHARE`, sem travar a coleta: um lote e o `finish` da mesma tentativa ficam em série, e o cálculo de status da A1.7 vê todos os itens. Não recalcula o status nem grava evento. As linhas entram em ordem de chave, para dois lotes simultâneos não se travarem em ordens diferentes.
+  - `done-items`: `FINISHED`, `FINISHED_EMPTY` e `FILE_NOT_FOUND`, por chave; `FAILED` é coletado de novo. Coleta inexistente: 404 `COLLECTION_NOT_FOUND`.
+  - Erros: base `OrchestrationError` para os erros de tentativa e de coleta.
+- **`revisor-isolamento-banco`: ISOLADO.** Achados corrigidos: a ordem das linhas no upsert, a docstring das travas (com as duas regras de que a ausência de deadlock depende: a coleta só se trava em `FOR NO KEY UPDATE`, e ninguém trava a tentativa antes da coleta), a linha de índice do `item` no `modelo-de-dados.md` e o `AGENTS.md` do DC.
+- **Testes:** 545 passam e 3 são pulados no DC.
+- **Testes pulados (pergunta do Lucas, 29/10): teste pulado não valida nada; ou se corrige ou se remove.**
+  - Os dois de CNPJ alfanumérico (`test_cnpj_validator.py` e `test_utils_cnpj_validator.py`, herdados) escondiam um bug: o exemplo da IN RFB 2.229 (`12.ABC.345/01DE-35`) é válido, mas o validador herdado passava o CNPJ sem máscara à `fgslpycnpj`, que só aceita com máscara e chama `sys.exit`. Todo CNPJ alfanumérico era recusado, e o teste pulava. O dígito verificador passou a ser calculado no `app/utils/cnpj_validator.py` (módulo 11 com o valor ASCII − 48), a `fgslpycnpj` saiu das dependências e os testes deixaram de pular.
+  - **Alerta ao cliente (§3.10), a confirmar no DC atual:** o mesmo código está no DC atual da staging; se for o que roda, ele recusa CNPJ alfanumérico no pedido de coleta.
+  - O de integração com o Agnaldo real (decisão do Lucas, 29/10) ganhou o marcador `external` e saiu da suíte padrão (`addopts` com `-m 'not external'`): roda só com `uv run pytest -m external -n0`, porque precisa das credenciais do `.env` e do SSO real. Deixou de aparecer como pulado.
+  - Os dois arquivos de teste do CNPJ testam a mesma coisa; juntá-los no `test_utils_cnpj_validator.py` fica para quando o validador for tocado de novo (A1.16).
+- **Testes:** 547 passam e nenhum é pulado no DC (o `external` fica fora da suíte padrão).
+
+**Próximo:** A1.7 (cálculo único do status da coleta), com a regra da decisão 1 do plano de execução da #341 e a tabela de transições da coleta em `states.py`.
