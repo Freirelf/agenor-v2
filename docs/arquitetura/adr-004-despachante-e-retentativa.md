@@ -3,7 +3,7 @@
 - **Status:** Aceito
 - **Data:** 2026-10-27
 - **Origem:** plano, §3.0, §3.2 ("Configuração da fila") e §3.4 ("Retentativa", "Despachante", "Limites iniciais", "Abandono", "Duas contagens"); padrão do ADR-002 do Agnes Collector
-- **Atualizado:** 2026-10-29 (A1.3b): as contagens saem das tentativas, sem contador na coleta; o tipo do despachante é o da coleta. 2026-10-29 (A1.9): limite da retentativa de negócio por janela de tempo. 2026-10-29 (A1.8): como o despachante roda (trava bloqueante, laço na API, pelo menos uma vez)
+- **Atualizado:** 2026-10-29 (A1.3b): as contagens saem das tentativas, sem contador na coleta; o tipo do despachante é o da coleta. 2026-10-29 (A1.9): limite da retentativa de negócio por janela de tempo. 2026-10-29 (A1.8): como o despachante roda (trava bloqueante, laço na API, pelo menos uma vez). 2026-10-29 (A1.10): como o abandono roda e os avisos do Launcher
 
 ## Contexto
 
@@ -33,7 +33,7 @@ Roda **por evento** (coleta criada, tentativa encerrada) e numa **varredura a ca
 - **Trava bloqueante no despacho** (`pg_advisory_xact_lock`, com `lock_timeout`), não `try` (decisão do Lucas, 29/10): com o `try`, a réplica que perde a trava desistiria, e a que está despachando pode ter contado as vagas antes do fim que liberou uma; a vaga ou a coleta nova esperaria até 1 min. O despacho é curto e cada réplica espera no máximo uma rodada. A parte de abandono da varredura (A1.10) usa `pg_try_advisory_xact_lock`, com chave própria (as chaves são `(0x41474E32, n)`: 1 das migrações, 2 do despacho, 3 reservada ao abandono): basta uma réplica por vez.
 - **Uma transação por rodada:** vagas (tentativas com `dispatched_at` e não encerradas, por tipo da coleta), prontas (`QUEUED`, sem `dispatched_at`, `not_before` vencido, coleta não cancelada) em ordem de criação, e uma publicação por vez. Só depois da confirmação da fila a tentativa ganha `dispatched_at` e o evento `attempt.dispatched`. Se a fila falha ou não responde em 10 s, a rodada para e confirma as já publicadas; as outras ficam para a próxima. As publicações da rodada inteira cabem em 20 s, abaixo do `lock_timeout` (30 s, que vale só para pegar a trava), para uma fila lenta não segurar a trava das outras réplicas; a rodada que não pega a trava no `lock_timeout` desiste com aviso, e a próxima tenta de novo.
 - **Pelo menos uma vez:** se a transação não confirmar depois da publicação, a tentativa sai de novo na rodada seguinte. A mensagem repetida é inofensiva: o Launcher deduplica pelo nome do Job ([ADR-005](adr-005-launcher-com-kubernetes-jobs.md)), e só a tentativa vigente age.
-- O despacho atualiza a tentativa sem travar a coleta, e só se ela ainda estiver `QUEUED` e sem publicação (as prontas são lidas sem trava; a que terminou durante a publicação não ganha `dispatched_at` nem evento). Ele pode esperar uma transição (a linha da tentativa) ou um lote de itens, mas nenhum deles espera algo que ele segure: na coleta, ele só pede a `KEY SHARE` da FK do evento, compatível com o `FOR NO KEY UPDATE`. Sem ciclo, sem deadlock, enquanto cada transação de transição tocar uma coleta só (o abandono incluído).
+- O despacho atualiza a tentativa sem travar a coleta, e só se ela ainda for vigente e sem publicação (A1.10: o `JOB_CREATED` ou o `start` podem chegar antes da marcação, e a tentativa que avançou também é marcada, senão rodaria fora das vagas; as prontas são lidas sem trava; a que terminou durante a publicação não ganha `dispatched_at` nem evento). Ele pode esperar uma transição (a linha da tentativa) ou um lote de itens, mas nenhum deles espera algo que ele segure: na coleta, ele só pede a `KEY SHARE` da FK do evento, compatível com o `FOR NO KEY UPDATE`. Sem ciclo, sem deadlock, enquanto cada transação de transição tocar uma coleta só (o abandono incluído).
 - Limites em registro por tipo (`dispatch_limits()` em `dispatcher.py` do DC, Strategy): `DISPATCH_MAX_IN_FLIGHT` e `DISPATCH_MAX_IN_FLIGHT_BY_TYPE` ([infra.md](infra.md)).
 
 **Limites iniciais:** 6 no total, igual a hoje. Créditos DCTFWeb no máximo 4 (Moon). Os limites ficam em configuração e sobem conforme medirmos o Agnaldo e os proxies. Não há limite por procurador: o Agnaldo reserva sessões de forma atômica, e quem não consegue cai em `NO_SESSION`.
@@ -68,6 +68,19 @@ Detectado pelo banco na varredura, como no Agnes Collector:
 - **nenhum worker começou** a tentativa em 60 min depois de despachada (≈ 3 entregas de 15 min, quando a OCI move a mensagem para a DLQ).
 
 Nos dois casos a tentativa termina em `INFRA_FAILED`, conta uma falha técnica e a coleta ganha uma nova tentativa. A mensagem antiga, se voltar, é descartada como obsoleta ([ADR-002](adr-002-tentativa-e-status.md)). O Launcher também informa as falhas de Job que vê; o que chegar primeiro encerra a tentativa, e o segundo aviso é ignorado.
+
+**Como roda (A1.10, 29/10):**
+
+- **Na varredura, antes do despacho:** a rodada abandona e depois despacha; a vaga liberada e a retentativa técnica saem na mesma rodada.
+- **Uma réplica por vez, sem esperar:** a rodada abre uma transação com `pg_try_advisory_xact_lock` na chave 3 e, sem a trava, sai (outra réplica está varrendo). Com ela, lista as candidatas sem travar linhas e segura a trava até o fim da rodada.
+- **Uma transação por coleta:** cada candidata é encerrada noutra sessão, numa transação que entra por `lock_attempt` (a coleta antes da tentativa) e confere de novo a condição com o `now()` do banco: o `finish`, um aviso ou um sinal de vida pode ter chegado depois da lista. A trava só evita trabalho repetido; a nova conferência com a coleta travada é que garante um fim só. Falha numa coleta vai para o log, e a rodada segue.
+- **Publicação perdida:** se a rodada do despachante for desfeita depois de publicar e o Launcher criar o Job, o `JOB_CREATED` grava o `dispatched_at` que faltou (decisão do Lucas, 29/10): sem ele, a tentativa não ocuparia vaga e o abandono não a veria. Nesse caso não há o evento `attempt.dispatched`; o `attempt.job_created` registra o Job.
+- **Vagas presas:** a tentativa `QUEUED` publicada cuja mensagem foi para a DLQ ou foi descartada pelo Launcher ocupava o limite do despachante para sempre; o segundo caso a libera.
+- **Folga do `dispatched_at`:** ele é o `now()` da transação da rodada do despachante, até a espera pela trava mais o orçamento das publicações (cerca de 50 s) antes da publicação real. Os 60 min absorvem a diferença.
+- **Limites no código** (5 e 60 min, `abandonment.py` do DC), não em configuração: dependem do intervalo do sinal de vida do worker (1 min) e da fila (15 min × 3 entregas), e mudam junto com eles.
+- `error_code` `ABANDONED_NO_HEARTBEAT` ou `ABANDONED_NOT_STARTED`, `attempt.finished` com autor `SYSTEM`; o fim segue o mesmo caminho do aviso do Launcher (`end_attempt_by_system`): retentativa antes do recálculo do status.
+
+**Avisos do Launcher (A1.10):** o fim do Job encerra a tentativa vigente (`JOB_DEADLINE_EXCEEDED` em `TIMED_OUT`; `JOB_FAILED`, `JOB_OOM_KILLED`, `JOB_IMAGE_PULL_FAILED` e `JOB_SUCCEEDED` sem o resultado do worker em `INFRA_FAILED`), com a retentativa e o recálculo na mesma transação e o despachante acordado depois do commit. A regra de resposta está no [ADR-003](adr-003-contratos.md).
 
 ### Fila
 

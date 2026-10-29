@@ -150,11 +150,11 @@ Uma linha por vez que o DC manda executar a coleta (ADR-002). É também o que o
 | `number` | int, único com `collection_id` | Ordem da tentativa na coleta | DC | Worker (`input.attempt_number`), retentativa, A1.7 (últimas tentativas e `status_text`) | `collection_attempt.attempt_number` | = |
 | `status` | texto(32) + CHECK (`AttemptStatus`), padrão `QUEUED` | Ciclo da tentativa (ADR-002) | DC, a partir do Launcher, do worker e da varredura | Despachante, abandono, retentativa, A1.7 | `collection_attempt.status` (outros valores) | = |
 | `not_before` | timestamptz, padrão `now()` | Hora a partir da qual pode ser despachada: a espera da retentativa. O padrão deixa a primeira tentativa pronta para despachar na hora | DC (padrão `now()` na criação da coleta, A1.8; espera da retentativa, A1.9) | Despachante | `collection_attempt.next_attempt_at` | = |
-| `dispatched_at` | timestamptz, opcional | Publicada na fila e confirmada. Vazia: falta publicar | Despachante | Despachante (vagas e republicação), abandono (60 min sem início) | `collection_attempt.queued_at` | = |
+| `dispatched_at` | timestamptz, opcional | Publicada na fila e confirmada. Vazia: falta publicar | Despachante (com a tentativa vigente: o `JOB_CREATED` ou o `start` podem chegar antes da marcação, A1.10); aviso `JOB_CREATED` do Launcher, se a tentativa vigente ainda não a tem (o Job prova a publicação, e a rodada do despachante pode ter sido desfeita depois de publicar; decisão do Lucas, 29/10, A1.10) | Despachante (vagas e republicação), abandono (60 min sem início), aviso `JOB_CREATED` (só grava se vazia) | `collection_attempt.queued_at` | = |
 | `last_heartbeat_at` | timestamptz, opcional | Último sinal de vida (gravado também no `start`) | Worker (`start`, `heartbeat`) | Abandono (5 min) | — | = |
-| `error_code` | texto(64), opcional | Código tipado do erro (do worker) ou o tipo de falha (do Launcher ou do abandono) | Worker (`finish`), Launcher, varredura | A1.7 (`status_text`) | — | = |
-| `error_message` | texto, opcional | Mensagem do erro | Worker, Launcher, varredura | A1.7 (`status_text`) | `collection_attempt.error_message` | = |
-| `recoverable` | boolean, opcional | `FAILED` recuperável conta como retentativa de negócio; não recuperável leva a coleta a `FAILED` | Worker (`finish`) | Retentativa (A1.9) | marcação do `collection_error_map`, no scraper | = |
+| `error_code` | texto(64), opcional | Código tipado do erro (do worker) ou o tipo de falha: o nome do aviso do Launcher (`JOB_FAILED`, `JOB_DEADLINE_EXCEEDED`…) ou o motivo do abandono (`ABANDONED_NO_HEARTBEAT`, `ABANDONED_NOT_STARTED`), A1.10 | Worker (`finish`), Launcher, varredura | A1.7 (`status_text`); `finish` (repetição do mesmo resultado) | — | = |
+| `error_message` | texto, opcional | Mensagem do erro (do Launcher: o `detail` do aviso, ou a descrição do aviso quando ele não traz) | Worker, Launcher, varredura | A1.7 (`status_text`) | `collection_attempt.error_message` | = |
+| `recoverable` | boolean, opcional | `FAILED` recuperável conta como retentativa de negócio; não recuperável leva a coleta a `FAILED` | Worker (`finish`); nulo no fim pelo Launcher e pelo abandono (A1.10) | Retentativa (A1.9) | marcação do `collection_error_map`, no scraper | = |
 | `created_at` | timestamptz, padrão `now()` | Ordem de despacho ("em ordem de criação", ADR-004); hora da falha que gerou a retentativa (a janela da retentativa de negócio conta a partir dela) | DC | Despachante, retentativa (A1.9) | `collection_attempt.created_at` | = |
 | ~~`attempt_type`~~ | | | | | | sai (decisão 3) |
 | ~~`job_created_at`~~, ~~`job_name`~~, ~~`pod_name`~~, ~~`worker_version`~~, ~~`started_at`~~, ~~`finished_at`~~ | | | | | | sai: evento (decisão 4) |
@@ -164,7 +164,7 @@ Regras no banco:
 
 - **Uma ativa por coleta:** índice único parcial em `collection_id` onde `status IN ('QUEUED', 'STARTING', 'RUNNING')` (ADR-002). =
 - **Prontas para despachar:** índice parcial em `not_before` onde `status = 'QUEUED' AND dispatched_at IS NULL`. **muda:** sem `attempt_type`.
-- **Em voo:** índice parcial em `collection_id` onde `dispatched_at IS NOT NULL AND status IN ('QUEUED', 'STARTING', 'RUNNING')`, para as vagas por tipo (com o join na coleta) e o abandono. **muda:** sem `attempt_type`.
+- **Em voo:** índice parcial em `collection_id` onde `dispatched_at IS NOT NULL AND status IN ('QUEUED', 'STARTING', 'RUNNING')`, para as vagas por tipo (com o join na coleta). **muda:** sem `attempt_type`. O abandono (A1.10) não usa este índice: lê as vigentes pelos status (o predicado do índice único parcial acima), porque uma `RUNNING` sem `dispatched_at` (publicada, com a rodada desfeita) também é vigiada pelo sinal de vida.
 
 ### `item`: documento ou competência coletada
 
@@ -217,9 +217,9 @@ Catálogo dos eventos, fechado na A1.11 (`app/services/orchestration/events.py`,
 | `collection.cancelled` | `USER` | Cancelamento | — |
 | `attempt.created` | `SYSTEM` | Nova tentativa (primeira ou retentativa) | `number`, `not_before`, `reason` (`INITIAL` na primeira tentativa, criada com a coleta, A1.8; `TECHNICAL` ou `BUSINESS` na retentativa) |
 | `attempt.dispatched` | `SYSTEM` | Fila confirmou a publicação (despachante, A1.8) | — |
-| `attempt.job_created` | `SYSTEM` | Aviso `JOB_CREATED` do Launcher | `job_name` |
+| `attempt.job_created` | `SYSTEM` | Aviso `JOB_CREATED` do Launcher, com a tentativa `QUEUED` (A1.10) | `job_name`, `occurred_at` |
 | `attempt.started` | `ROBOT` | `start` do worker | `job_name`, `pod_name`, `worker_version` |
-| `attempt.finished` | `ROBOT` ou `SYSTEM` | `finish`, aviso do Launcher que encerra a tentativa, ou abandono | `status`, `error_code`, `recoverable`, `infra_event` |
+| `attempt.finished` | `ROBOT` ou `SYSTEM` | `finish`, aviso do Launcher que encerra a tentativa, ou abandono | `status`, `error_code`, `recoverable`, `infra_event` (o aviso do Launcher; nulo no `finish` e no abandono); do aviso do Launcher, também `job_name` e `occurred_at` (A1.10) |
 
 Os itens não geram um evento por mudança: a linha do item é o estado, e o volume (centenas de itens por coleta) não compensa.
 

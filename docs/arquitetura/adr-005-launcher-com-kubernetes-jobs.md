@@ -47,7 +47,7 @@ A mensagem é apagada **depois que o Job é criado**. Se o Launcher cair entre c
 
 ### Acompanhamento
 
-Observa os Jobs e informa ao DC, em todos os casos, como cada um terminou: sucesso, falha, prazo estourado, falta de memória ou imagem inexistente (`POST /attempts/{id}/infra-event`). O DC decide o que fazer.
+Observa os Jobs e informa ao DC, em todos os casos, como cada um terminou: sucesso, falha, prazo estourado, falta de memória ou imagem inexistente (`POST /attempts/{id}/infra-event`). O DC decide o que fazer. O DC responde 200 a todo aviso de uma tentativa que existe, inclusive repetido ou atrasado (A1.10, [ADR-003](adr-003-contratos.md)): o Launcher só repete o aviso em erro de rede ou 5xx, e um `JOB_SUCCEEDED` também é informado, porque o DC trata como falha o Job que terminou sem o worker informar o resultado.
 
 ### Reinício e réplicas
 

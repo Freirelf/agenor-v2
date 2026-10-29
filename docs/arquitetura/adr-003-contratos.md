@@ -48,6 +48,8 @@ Nova, versionada e só para o Agenor 2.0, sob o prefixo `/api/v2`. Modelos em `a
 |---|---|
 | `POST /attempts/{id}/infra-event` | Job criado; Job terminou (sucesso, falha, prazo estourado, falta de memória, imagem inexistente) |
 
+O `infra-event` (A1.10, 29/10) nunca é recusado pelo estado da tentativa: o Launcher só informa, e o DC decide. `JOB_CREATED` leva uma tentativa `QUEUED` a `STARTING`; em qualquer outro status não muda o status (o `start` pode chegar antes). Se a tentativa vigente ainda não tem `dispatched_at`, ele o grava: o Job prova a publicação ([ADR-004](adr-004-despachante-e-retentativa.md)). O primeiro aviso de fim encerra a tentativa vigente; os seguintes (repetidos, atrasados ou depois do `finish`) respondem 200 com o estado atual, sem mudança. `JOB_SUCCEEDED` com a tentativa ainda vigente quer dizer que o worker saiu sem informar o resultado: termina em `INFRA_FAILED`, e a retentativa retoma pelos itens já concluídos. Tentativa inexistente: 404 `ATTEMPT_NOT_FOUND`. O `error_code` é o nome do aviso, e o `detail` vira o `error_message`.
+
 ### 5. API do consumidor no DC
 
 Solicitar a coleta, consultar o status, listar e baixar, **com o mesmo contrato de solicitação e consulta que o DC atual expõe ao Agenor**, sobre o `agenor_coleta`. É o que torna a virada uma troca de rota ([ADR-009](adr-009-virada-unica-pelos-consumidores.md)). O mapeamento exato das rotas atuais é feito na A1.16.
