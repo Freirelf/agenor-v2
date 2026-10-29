@@ -3,7 +3,7 @@
 - **Status:** Aceito
 - **Data:** 2026-10-27
 - **Origem:** plano, §3.0, §3.2 ("Configuração da fila") e §3.4 ("Retentativa", "Despachante", "Limites iniciais", "Abandono", "Duas contagens"); padrão do ADR-002 do Agnes Collector
-- **Atualizado:** 2026-10-29 (A1.3b): as contagens saem das tentativas, sem contador na coleta; o tipo do despachante é o da coleta. 2026-10-29 (A1.9): limite da retentativa de negócio por janela de tempo
+- **Atualizado:** 2026-10-29 (A1.3b): as contagens saem das tentativas, sem contador na coleta; o tipo do despachante é o da coleta. 2026-10-29 (A1.9): limite da retentativa de negócio por janela de tempo. 2026-10-29 (A1.8): como o despachante roda (trava bloqueante, laço na API, pelo menos uma vez)
 
 ## Contexto
 
@@ -25,7 +25,16 @@ A **tabela de tentativas é a fila de verdade**; a OCI Queue só transporta o qu
 3. escolhe as próximas tentativas prontas (hora de retentativa já chegou), em ordem de criação;
 4. publica na fila e, **só depois que a fila confirma**, marca a tentativa como despachada (`dispatched_at`).
 
-Roda **por evento** (coleta criada, tentativa encerrada) e numa **varredura a cada 1 min**, que republica o que falhou ao publicar, libera as retentativas cuja hora chegou e detecta abandono. Existe um único processo de varredura.
+Roda **por evento** (coleta criada, tentativa encerrada) e numa **varredura a cada 1 min**, que republica o que falhou ao publicar, libera as retentativas cuja hora chegou e detecta abandono. A varredura roda em cada réplica da API, mas uma de cada vez (trava no banco).
+
+**Como roda (A1.8, 29/10):**
+
+- **Dentro do processo da API** (decisão 3 da #341): cada réplica tem uma tarefa que roda o despachante a cada `DISPATCH_SWEEP_SECONDS` (60) ou quando é acordada depois da transação que criou a coleta ou encerrou a tentativa. Pedidos que chegam durante uma rodada se juntam na seguinte. Sem Deployment novo.
+- **Trava bloqueante no despacho** (`pg_advisory_xact_lock`, com `lock_timeout`), não `try` (decisão do Lucas, 29/10): com o `try`, a réplica que perde a trava desistiria, e a que está despachando pode ter contado as vagas antes do fim que liberou uma; a vaga ou a coleta nova esperaria até 1 min. O despacho é curto e cada réplica espera no máximo uma rodada. A parte de abandono da varredura (A1.10) usa `pg_try_advisory_xact_lock`, com chave própria (as chaves são `(0x41474E32, n)`: 1 das migrações, 2 do despacho, 3 reservada ao abandono): basta uma réplica por vez.
+- **Uma transação por rodada:** vagas (tentativas com `dispatched_at` e não encerradas, por tipo da coleta), prontas (`QUEUED`, sem `dispatched_at`, `not_before` vencido, coleta não cancelada) em ordem de criação, e uma publicação por vez. Só depois da confirmação da fila a tentativa ganha `dispatched_at` e o evento `attempt.dispatched`. Se a fila falha ou não responde em 10 s, a rodada para e confirma as já publicadas; as outras ficam para a próxima. As publicações da rodada inteira cabem em 20 s, abaixo do `lock_timeout` (30 s, que vale só para pegar a trava), para uma fila lenta não segurar a trava das outras réplicas; a rodada que não pega a trava no `lock_timeout` desiste com aviso, e a próxima tenta de novo.
+- **Pelo menos uma vez:** se a transação não confirmar depois da publicação, a tentativa sai de novo na rodada seguinte. A mensagem repetida é inofensiva: o Launcher deduplica pelo nome do Job ([ADR-005](adr-005-launcher-com-kubernetes-jobs.md)), e só a tentativa vigente age.
+- O despacho atualiza a tentativa sem travar a coleta, e só se ela ainda estiver `QUEUED` e sem publicação (as prontas são lidas sem trava; a que terminou durante a publicação não ganha `dispatched_at` nem evento). Ele pode esperar uma transição (a linha da tentativa) ou um lote de itens, mas nenhum deles espera algo que ele segure: na coleta, ele só pede a `KEY SHARE` da FK do evento, compatível com o `FOR NO KEY UPDATE`. Sem ciclo, sem deadlock, enquanto cada transação de transição tocar uma coleta só (o abandono incluído).
+- Limites em registro por tipo (`dispatch_limits()` em `dispatcher.py` do DC, Strategy): `DISPATCH_MAX_IN_FLIGHT` e `DISPATCH_MAX_IN_FLIGHT_BY_TYPE` ([infra.md](infra.md)).
 
 **Limites iniciais:** 6 no total, igual a hoje. Créditos DCTFWeb no máximo 4 (Moon). Os limites ficam em configuração e sobem conforme medirmos o Agnaldo e os proxies. Não há limite por procurador: o Agnaldo reserva sessões de forma atômica, e quem não consegue cai em `NO_SESSION`.
 

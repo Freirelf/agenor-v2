@@ -57,6 +57,14 @@ Credencial: API key de usuário OCI, num Secret **montado como arquivo** no DC v
 | `OCI_QUEUE_ID` e `OCI_QUEUE_ENDPOINT` (`https://cell-1.queue.messaging.sa-saopaulo-1.oci.oraclecloud.com`) | Definido (A1.17). Apontam para a fila nova, não para a do DC atual (`OCI_AGENOR_QUEUE_ID`) |
 | `OCI_CONFIG_FILE` (caminho do `config` montado do Secret, que aponta para a `.pem`) e `OCI_CONFIG_PROFILE` (padrão `DEFAULT`) | Definido (A1.17) |
 
+Despachante (só DC v2, opcionais; [ADR-004](adr-004-despachante-e-retentativa.md)):
+
+| Variável | Padrão | O que é |
+|---|---|---|
+| `DISPATCH_MAX_IN_FLIGHT` | 6 | Tentativas despachadas e não concluídas, no total |
+| `DISPATCH_MAX_IN_FLIGHT_BY_TYPE` | `{"CREDITOS_DCTF_WEB": 4}` | Limite por tipo de coleta, em JSON; o tipo fora da lista só tem o limite total |
+| `DISPATCH_SWEEP_SECONDS` | 60 | Intervalo da varredura, que roda dentro de cada réplica da API (uma por vez, pela trava no banco) |
+
 Retentativa (só DC v2, opcional): `RETRY_BUSINESS_WINDOW_HOURS`, por quanto tempo uma coleta insiste depois da primeira falha de negócio (`NO_SESSION` ou falha recuperável). Padrão 8; calibrado em STG ([ADR-004](adr-004-despachante-e-retentativa.md)).
 
 ## Bucket

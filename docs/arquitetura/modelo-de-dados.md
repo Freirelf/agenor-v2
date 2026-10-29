@@ -120,7 +120,7 @@ Uma linha por pedido. A entrada não muda depois de criada; o status é só do D
 | Coluna | Tipo | Para que serve | Escreve | Lê | No `public` | Muda |
 |---|---|---|---|---|---|---|
 | `id` | uuid, PK | Identifica a coleta (`collected_id` no evento da fila e nas APIs) | DC | todos | `collected.id` | = |
-| `collection_type` | texto(32) + CHECK (9 tipos do consumidor) | Qual worker roda; agrupa a capacidade do despachante | Consumidor | Despachante, worker (`input`) | `collected.collection_type` | = |
+| `collection_type` | texto(32) + CHECK (9 tipos do consumidor) | Qual worker roda; agrupa a capacidade do despachante | Consumidor | Despachante, retentativa (A1.9, política do tipo), worker (`input`) | `collected.collection_type` | = |
 | `client_document` | texto(14) | CNPJ do cliente | Consumidor | Worker (`input`) | `collected.client_document` | = |
 | `power_of_attorney_document` | texto(14) | CNPJ ou CPF do procurador (certificado). Obrigatório: sem ele, o worker não abre sessão | Consumidor | Worker (`input`) | `collected.power_of_attorney_document` (lá, opcional) | = |
 | `data_filters` | jsonb, padrão `{}` | Filtros do pedido, já normalizados pelo DC | Consumidor (DC normaliza) | Worker (`input`) | parte do `collected.request_payload` | = |
@@ -129,7 +129,7 @@ Uma linha por pedido. A entrada não muda depois de criada; o status é só do D
 | `request_user_name` | texto(512), opcional | Nome de quem pediu, junto do id | Consumidor (header) | Auditoria | `collected.request_user_name` | = |
 | `status` | texto(32) + CHECK (`CollectedStatus`, os 8 de hoje), padrão `PENDING` | Status da coleta | DC (A1.7), único escritor | Consumidor | `collected.status` | = |
 | `status_text` | texto, opcional | Status legível, com o motivo (ADR-002) | DC (A1.7) | Consumidor | `failure_reason`, que o DC atual derivava dos eventos | = |
-| `cancelled_at` | timestamptz, opcional | Marca a coleta como cancelada: o status não tem `CANCELLED`. O `input` e o `heartbeat` respondem `active = false`, e a retentativa não cria nova tentativa | DC (cancelamento; a chamada ainda não existe no contrato do consumidor, entra com a A1.16 ou o cenário de cancelamento da A2.10) | DC (A1.5, A1.9; A1.7 no `status_text`) | — | = |
+| `cancelled_at` | timestamptz, opcional | Marca a coleta como cancelada: o status não tem `CANCELLED`. O `input` e o `heartbeat` respondem `active = false`, e a retentativa não cria nova tentativa | DC (cancelamento; a chamada ainda não existe no contrato do consumidor, entra com a A1.16 ou o cenário de cancelamento da A2.10) | DC (A1.5, A1.9; A1.7 no `status_text`); despachante (A1.8: coleta cancelada não é despachada) | — | = |
 | `created_at` | timestamptz, padrão `now()` | Hora do pedido | DC | Consumidor | `collected.created_at` | = |
 | ~~`request_payload`~~ | | | | | | sai (decisão 2) |
 | ~~`technical_failures`~~, ~~`business_retries`~~ | | | | | | sai (decisão 1) |
@@ -149,7 +149,7 @@ Uma linha por vez que o DC manda executar a coleta (ADR-002). É também o que o
 | `collection_id` | uuid, FK `collection` | A coleta | DC | todos | `collection_attempt.collected_id` | = |
 | `number` | int, único com `collection_id` | Ordem da tentativa na coleta | DC | Worker (`input.attempt_number`), retentativa, A1.7 (últimas tentativas e `status_text`) | `collection_attempt.attempt_number` | = |
 | `status` | texto(32) + CHECK (`AttemptStatus`), padrão `QUEUED` | Ciclo da tentativa (ADR-002) | DC, a partir do Launcher, do worker e da varredura | Despachante, abandono, retentativa, A1.7 | `collection_attempt.status` (outros valores) | = |
-| `not_before` | timestamptz, padrão `now()` | Hora a partir da qual pode ser despachada: a espera da retentativa. O padrão deixa a primeira tentativa pronta para despachar na hora | DC (A1.9) | Despachante | `collection_attempt.next_attempt_at` | = |
+| `not_before` | timestamptz, padrão `now()` | Hora a partir da qual pode ser despachada: a espera da retentativa. O padrão deixa a primeira tentativa pronta para despachar na hora | DC (padrão `now()` na criação da coleta, A1.8; espera da retentativa, A1.9) | Despachante | `collection_attempt.next_attempt_at` | = |
 | `dispatched_at` | timestamptz, opcional | Publicada na fila e confirmada. Vazia: falta publicar | Despachante | Despachante (vagas e republicação), abandono (60 min sem início) | `collection_attempt.queued_at` | = |
 | `last_heartbeat_at` | timestamptz, opcional | Último sinal de vida (gravado também no `start`) | Worker (`start`, `heartbeat`) | Abandono (5 min) | — | = |
 | `error_code` | texto(64), opcional | Código tipado do erro (do worker) ou o tipo de falha (do Launcher ou do abandono) | Worker (`finish`), Launcher, varredura | A1.7 (`status_text`) | — | = |
@@ -215,8 +215,8 @@ Catálogo dos eventos, fechado na A1.11 (`app/services/orchestration/events.py`,
 | `collection.created` | `USER` | Pedido aceito | — |
 | `collection.status_changed` | `SYSTEM` | A1.7 muda o status | `old`, `new` |
 | `collection.cancelled` | `USER` | Cancelamento | — |
-| `attempt.created` | `SYSTEM` | Nova tentativa (primeira ou retentativa) | `number`, `not_before`, `reason` (`TECHNICAL` ou `BUSINESS` na retentativa; o valor da primeira tentativa entra com a criação da coleta, A1.8) |
-| `attempt.dispatched` | `SYSTEM` | Fila confirmou a publicação | — |
+| `attempt.created` | `SYSTEM` | Nova tentativa (primeira ou retentativa) | `number`, `not_before`, `reason` (`INITIAL` na primeira tentativa, criada com a coleta, A1.8; `TECHNICAL` ou `BUSINESS` na retentativa) |
+| `attempt.dispatched` | `SYSTEM` | Fila confirmou a publicação (despachante, A1.8) | — |
 | `attempt.job_created` | `SYSTEM` | Aviso `JOB_CREATED` do Launcher | `job_name` |
 | `attempt.started` | `ROBOT` | `start` do worker | `job_name`, `pod_name`, `worker_version` |
 | `attempt.finished` | `ROBOT` ou `SYSTEM` | `finish`, aviso do Launcher que encerra a tentativa, ou abandono | `status`, `error_code`, `recoverable`, `infra_event` |
