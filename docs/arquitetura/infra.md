@@ -119,7 +119,7 @@ Repositórios no Harbor (pedido 4):
 
 O DC v2 usa uma imagem própria, separada da do DC atual (A1.4): `Dockerfile` do repositório, sem root (uid 10001), na porta 9092. A mesma imagem serve à API (padrão) e ao Job de migração (`python -m app.migrate`). Enquanto o `agenor-common` é instalado pelo caminho local, o build exige `--build-context agenor-common=../agenor-common`; com a tag Git publicada, deixa de exigir.
 
-**Entrada de cada Job,** definida pelo Launcher como variáveis de ambiente (definido, `core/settings.py`):
+**Entrada de cada Job,** definida pelo Launcher como variáveis de ambiente (definido, `core/config.py`):
 
 | Variável | Conteúdo |
 |---|---|

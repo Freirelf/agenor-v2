@@ -329,3 +329,33 @@ A #341 (orquestração) começou pelo levantamento no código e parou ali, por d
 - **Pausa (decisão do Lucas, 29/10):** a #341 para depois da A1.5, com commit do que está pronto, para definir os padrões de código e desenvolvimento antes de seguir.
 
 **Próximo:** padrões de código e desenvolvimento; depois, a #341 retoma pela A1.6 (itens idempotentes e itens já concluídos).
+
+### Desenvolvimento, 29/10: padrões de código e desenvolvimento
+
+- **Por que entrou:** o projeto tinha padrão de arquitetura (os ADRs, com os padrões do Agnes Collector) e de ferramentas, mas não de código nem de trabalho. O DC seguia em parte a estrutura herdada do DC atual e em parte o que cada sessão decidia. O levantamento mostrou:
+  - nomes misturados: `repositories/coleta.py`, `establishment_repository.py`, `health_router.py`;
+  - duas formas de abrir sessão no banco: o `get_db` e o `UnitOfWork` herdados e o `get_session` novo;
+  - segredos em `str` (foi o que deixou o erro do pydantic imprimir o `.env` na A1.5) e dois jeitos de logar;
+  - `ruff` só com as regras padrão e nenhuma checagem de tipos. Com as regras novas, 97 achados no DC e nenhum nos outros; o `mypy` achou 257 erros no DC (quase todos nos schemas herdados e cerca de 10 no código novo, um deles um retorno que podia ser `None`) e 5 no `agenor-common`.
+- **Documentos (aprovados pelo Lucas em 29/10):** `docs/arquitetura/visao-geral.md` (as peças, uma coleta de ponta a ponta e qual documento manda em cada assunto), `docs/arquitetura/padroes-de-codigo.md` e `docs/padroes-de-desenvolvimento.md` (sequência da atividade, pronto quando, documentação, Git, revisão, dependências e segurança). O `AGENTS.md` da raiz e o de cada repositório apontam para eles.
+- **Decisões, com a recomendação aceita:**
+  1. Organização por camada (rota → serviço → repositório → modelo, mais `clients/`), não por domínio: é o padrão mais usado em FastAPI e basta para o tamanho do projeto. Nada de hexagonal, DDD, repositório genérico, contêiner de injeção ou unit of work próprio.
+  2. Logs com `logging` da biblioteca padrão; a saída em JSON fica para a A1.14, e o `loguru` herdado sai quando cada arquivo for tocado. Até a A1.14, os logs de `logging` em nível INFO não aparecem (só o `loguru` está configurado).
+  3. `mypy` no `verify.sh` de todos os repositórios, com o plugin do pydantic; o herdado que não passa fica em `[[tool.mypy.overrides]]`, com o motivo.
+  4. `ruff` com `E`, `W`, `F`, `I`, `B`, `UP`, `SIM`, `RUF`, `PT`, `ASYNC` e `C4`; o `E501` fica de fora porque o `ruff format` cuida do comprimento do código.
+  5. Workers podem ser síncronos (uma tentativa por processo, código portado síncrono); DC e Launcher são assíncronos.
+- **Aplicação:**
+  - **DC, renomeações (commit separado):** `connectors/` → `clients/` (com `storage.py` e `storage_boto3.py`), `app/queue.py` → `clients/queue.py`, `repositories/coleta.py` → `collection.py`, `establishment_repository.py` → `repositories/establishment.py`, `establishment_service.py` → `services/establishment.py`, `health_router.py` → `routers/health.py`, e os testes no formato `test_<camada>_<módulo>.py`.
+  - **DC, comportamento:** uma só sessão de banco (`app/database.py` com `get_session`, criada na primeira chamada; saíram o `get_db`, o `UnitOfWork` e o `routers/v2/session.py`). O `pool_reset_on_return="commit"` herdado também saiu: com a transação no serviço, o padrão do SQLAlchemy (rollback) é o certo. Segredos em `SecretStr` com `hide_input_in_errors`, com teste de que o erro não mostra o valor. Os achados do `ruff` e do `mypy` no código novo corrigidos (o `_load` da tentativa passou a usar `session.get_one`); o herdado ficou nas exceções do `pyproject.toml`, cada uma com o motivo.
+  - **`agenor-common`:** os 5 erros de tipo (`create_queue` passa os campos obrigatórios por `_required`).
+  - **Launcher e workers:** `settings.py` → `config.py`, `hide_input_in_errors`, rotas assíncronas no Launcher e `attempt_id`/`collected_id` como UUID no worker.
+- **Testes:** DC 447 passam e 3 são pulados (saíram os 7 testes do `get_db` e do `UnitOfWork`, entraram 4); `agenor-common` 46; Launcher 2; workers 2.
+- **`revisor-isolamento-banco`: ISOLADO.** Os engines do DC v2 e do company-service ficam separados, toda transação desfaz no erro, e a URL do Alembic usa a senha real do `SecretStr`. Achados menores, todos herdados e fora do isolamento, ficam para quando o código for tocado:
+  - a senha entra na URL por f-string, sem escapar (`URL.create` resolve);
+  - o engine de filiais não é fechado no shutdown e herda o pool do v2 (até 50 conexões para um banco só de leitura);
+  - o `except Exception` do repositório de filiais devolve lista vazia em qualquer falha;
+  - o `Establishment` não tem schema, e só é seguro porque a URL de filiais é a do company-service.
+
+  Os três últimos entram na A1.16, quando a API do consumidor usar as filiais; o primeiro, na A1.14, com a configuração.
+
+**Próximo:** a #341 retoma pela A1.6 (itens idempotentes e itens já concluídos), no padrão de código.

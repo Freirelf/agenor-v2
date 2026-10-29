@@ -6,6 +6,12 @@ Decisões técnicas do Agenor 2.0 (ADRs) e o que o código precisa do ambiente (
 Agenor → Document Collector v2 → fila → Launcher → Job do worker (um por tentativa, um tipo por worker)
 ```
 
+## Por onde começar
+
+- [visao-geral.md](visao-geral.md): as peças, o caminho de uma coleta e qual documento manda em cada assunto.
+- [padroes-de-codigo.md](padroes-de-codigo.md): como o código de cada serviço se organiza (camadas, transação, erros, nomes, tipos, testes).
+- [../padroes-de-desenvolvimento.md](../padroes-de-desenvolvimento.md): como trabalhamos (sequência da atividade, pronto quando, Git, revisão, documentação).
+
 ## Decisões (ADRs)
 
 | ADR | Decisão |
